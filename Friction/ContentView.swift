@@ -32,7 +32,7 @@ struct ContentView: View {
             } else {
                 Text("Friction is active.")
                     .font(.headline)
-                Text("\(selection.applicationTokens.count) app(s) blocked 9am–5pm")
+                Text("\(selection.applicationTokens.count + selection.categoryTokens.count) item(s) blocked 9am–5pm")
                     .foregroundStyle(.secondary)
                 Button("Change blocked apps") {
                     isPickerPresented = true

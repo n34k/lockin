@@ -1,5 +1,6 @@
 import SwiftUI
 import UserNotifications
+import ManagedSettings
 
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
@@ -10,7 +11,16 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         if response.notification.request.identifier == "friction.unlock" {
+            let type = SharedState.loadPendingUnlockType()
+            let data = SharedState.loadPendingUnlockData()
             DispatchQueue.main.async {
+                if let data {
+                    if type == "app", let token = try? JSONDecoder().decode(ApplicationToken.self, from: data) {
+                        AppState.shared.pendingUnlockApp = token
+                    } else if type == "category", let token = try? JSONDecoder().decode(ActivityCategoryToken.self, from: data) {
+                        AppState.shared.pendingUnlockCategory = token
+                    }
+                }
                 AppState.shared.showingUnlock = true
             }
         }

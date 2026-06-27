@@ -50,7 +50,7 @@ struct UnlockView: View {
 
                 Button("Submit") {
                     if answer == "\(problem.a + problem.b)" {
-                        ManagedSettingsStore().shield.applications = nil
+                        unlockTargeted()
                         withAnimation { showingSuccess = true }
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                             appState.showingUnlock = false
@@ -69,6 +69,27 @@ struct UnlockView: View {
         }
         .padding()
         .interactiveDismissDisabled(true)
+    }
+
+    private func unlockTargeted() {
+        let store = ManagedSettingsStore()
+        if let app = appState.pendingUnlockApp {
+            store.shield.applications?.remove(app)
+            appState.pendingUnlockApp = nil
+        } else if let category = appState.pendingUnlockCategory {
+            switch store.shield.applicationCategories {
+            case .specific(let cats, let exceptions):
+                let remaining = cats.subtracting([category])
+                store.shield.applicationCategories = remaining.isEmpty ? nil : .specific(remaining, except: exceptions)
+            default:
+                store.shield.applicationCategories = nil
+            }
+            appState.pendingUnlockCategory = nil
+        } else {
+            store.shield.applications = nil
+            store.shield.applicationCategories = nil
+        }
+        SharedState.clearPendingUnlock()
     }
 }
 
