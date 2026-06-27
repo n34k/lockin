@@ -6,14 +6,20 @@
 //
 
 import ManagedSettings
+import UserNotifications
 
 class ShieldActionExtension: ShieldActionDelegate {
     override func handle(action: ShieldAction, for application: ApplicationToken, completionHandler: @escaping (ShieldActionResponse) -> Void) {
         switch action {
         case .primaryButtonPressed:
-            // Phase 1: remove shield directly for testing. Phase 2: fire a notification instead.
-            ManagedSettingsStore().shield.applications = nil
-            completionHandler(.close)
+            let content = UNMutableNotificationContent()
+            content.title = "Time to earn it"
+            content.body = "Tap to start the unlock ritual."
+            content.sound = .default
+            let request = UNNotificationRequest(identifier: "friction.unlock", content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request) { _ in
+                completionHandler(.defer)
+            }
         case .secondaryButtonPressed:
             completionHandler(.close)
         default:

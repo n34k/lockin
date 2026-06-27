@@ -10,6 +10,7 @@ import FamilyControls
 import DeviceActivity
 
 struct ContentView: View {
+    @EnvironmentObject var appState: AppState
     @State private var isPickerPresented = false
     @State private var selection = FamilyActivitySelection()
     @State private var isAuthorized = false
@@ -47,6 +48,10 @@ struct ContentView: View {
         }
         .onAppear {
             isAuthorized = AuthorizationCenter.shared.authorizationStatus == .approved
+        }
+        .sheet(isPresented: $appState.showingUnlock) {
+            UnlockView()
+                .environmentObject(appState)
         }
     }
 
