@@ -11,7 +11,7 @@ import Playgrounds
     )
 
     let session = LanguageModelSession {
-        Instructions(mascotSystemInstructions)
+        Instructions(buildMascotSystemInstructions())
     }
 
     let response = try await session.respond(

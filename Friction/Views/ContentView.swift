@@ -12,6 +12,7 @@ import ManagedSettings
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.scenePhase) private var scenePhase
+    @State private var onboardingComplete = SharedState.hasCompletedOnboarding
     @State private var schedules = SharedState.loadSchedules()
     @State private var isAuthorized = false
     @State private var editingSchedule: BlockSchedule? = nil
@@ -19,6 +20,24 @@ struct ContentView: View {
     @State private var blockedCategories: Set<ActivityCategoryToken> = []
 
     var body: some View {
+        if !onboardingComplete {
+            OnboardingView {
+                onboardingComplete = true
+                schedules = SharedState.loadSchedules()
+                isAuthorized = AuthorizationCenter.shared.authorizationStatus == .approved
+                ScheduleEngine.shared.apply(schedules)
+                syncShields()
+            }
+        } else {
+            mainView
+                .sheet(isPresented: $appState.showingUnlock) {
+                    UnlockView()
+                        .environmentObject(appState)
+                }
+        }
+    }
+
+    private var mainView: some View {
         NavigationStack {
             Group {
                 if !isAuthorized {
@@ -36,6 +55,17 @@ struct ContentView: View {
                         }
                     }
                 }
+                #if DEBUG
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Reset") {
+                        SharedState.resetOnboarding()
+                        schedules = []
+                        SharedState.saveSchedules([])
+                        onboardingComplete = false
+                    }
+                    .foregroundStyle(.red)
+                }
+                #endif
             }
         }
         .onAppear {
@@ -53,10 +83,6 @@ struct ContentView: View {
             ScheduleEditorView(schedule: schedule) { updated in
                 saveOrAppend(updated)
             }
-        }
-        .sheet(isPresented: $appState.showingUnlock) {
-            UnlockView()
-                .environmentObject(appState)
         }
     }
 

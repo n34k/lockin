@@ -12,12 +12,14 @@ struct MascotChallenge: UnlockChallenge {
     @State private var didUnlock = false
     @State private var isLoading = false
     @FocusState private var inputFocused: Bool
-    @State private var session = LanguageModelSession {
-        Instructions(mascotSystemInstructions)
-    }
+    @State private var session: LanguageModelSession
 
     init(onUnlock: @escaping (Int?) -> Void) {
         self.onUnlock = onUnlock
+        let instructions = buildMascotSystemInstructions(profile: SharedState.loadUserProfile())
+        self._session = State(wrappedValue: LanguageModelSession {
+            Instructions(instructions)
+        })
     }
 
     var body: some View {

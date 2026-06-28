@@ -4,6 +4,14 @@ import DeviceActivity
 
 let appGroupID = "group.ndenterprises.Friction"
 
+struct UserProfile: Codable {
+    var name: String
+    var age: Int
+    var dailyWasteHours: Double
+    var occupation: String
+    var cutbackReason: String
+}
+
 extension DeviceActivityName {
     static let work = Self("friction.work")
 
@@ -136,6 +144,30 @@ enum SharedState {
         let name = defaults.string(forKey: pendingScheduleNameKey) ?? ""
         let reason = defaults.string(forKey: pendingScheduleReasonKey) ?? ""
         return (name, reason)
+    }
+
+    private static let userProfileKey    = "userProfile"
+    private static let onboardingDoneKey = "onboardingComplete"
+
+    static func saveUserProfile(_ profile: UserProfile) {
+        guard let data = try? JSONEncoder().encode(profile) else { return }
+        defaults.set(data, forKey: userProfileKey)
+        defaults.set(true, forKey: onboardingDoneKey)
+    }
+
+    static func loadUserProfile() -> UserProfile? {
+        guard let data = defaults.data(forKey: userProfileKey),
+              let p = try? JSONDecoder().decode(UserProfile.self, from: data) else { return nil }
+        return p
+    }
+
+    static var hasCompletedOnboarding: Bool {
+        defaults.bool(forKey: onboardingDoneKey)
+    }
+
+    static func resetOnboarding() {
+        defaults.removeObject(forKey: onboardingDoneKey)
+        defaults.removeObject(forKey: userProfileKey)
     }
 
     static func clearPendingUnlock() {
