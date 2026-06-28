@@ -13,6 +13,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         if response.notification.request.identifier == "friction.unlock" {
             let type = SharedState.loadPendingUnlockType()
             let data = SharedState.loadPendingUnlockData()
+            let scheduleContext = SharedState.loadPendingScheduleContext()
             DispatchQueue.main.async {
                 if let data {
                     if type == "app", let token = try? JSONDecoder().decode(ApplicationToken.self, from: data) {
@@ -21,6 +22,9 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                         AppState.shared.pendingUnlockCategory = token
                     }
                 }
+                AppState.shared.pendingAppName = SharedState.loadPendingAppName() ?? ""
+                AppState.shared.pendingScheduleName = scheduleContext.name
+                AppState.shared.pendingScheduleReason = scheduleContext.reason
                 AppState.shared.showingUnlock = true
             }
         }

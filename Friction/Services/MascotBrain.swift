@@ -18,34 +18,61 @@ struct MascotResponse {
 
 struct UnlockContext {
     let appName: String
-    let userOccupation: String
-    let unlocksToday: Int
+    let scheduleName: String
     let blockReason: String
+    let unlocksToday: Int
 
     static let placeholder = UnlockContext(
-        appName: "Cash App",
-        userOccupation: "Software engineer",
-        unlocksToday: 0,
-        blockReason: "Stay focused while making my app"
+        appName: "Instagram",
+        scheduleName: "Work Focus",
+        blockReason: "Stay focused while making my app",
+        unlocksToday: 0
     )
 }
 
-func buildUnlockPrompt(userMessage: String, context: UnlockContext) -> String {
-    """
-    App the user wants to unlock: \(context.appName)
-    Why the user blocked this app: \(context.blockReason)
-    User's occupation: \(context.userOccupation)
-    Times they've unlocked apps today: \(context.unlocksToday)
+func buildOpenerPrompt(context: UnlockContext) -> String {
+    print("Context: \(context)")
 
-    User says: "\(userMessage)"
-    """
+    var lines: [String] = []
+    if !context.appName.isEmpty {
+        lines.append("App the user wants to unlock: \(context.appName)")
+    }
+    if !context.scheduleName.isEmpty {
+        lines.append("Schedule that blocked it: \(context.scheduleName)")
+    }
+    if !context.blockReason.isEmpty {
+        lines.append("Why the user set up this block: \(context.blockReason)")
+    }
+    lines.append("Times they've unlocked apps today: \(context.unlocksToday)")
+    lines.append("")
+    lines.append("The user just tapped to unlock. React to the situation in one punchy line — call out what they're doing. Don't ask for their reason yet, don't unlock.")
+    return lines.joined(separator: "\n")
 }
+
+func buildUnlockPrompt(userMessage: String, context: UnlockContext) -> String {
+    print("Context: \(context)")
+    
+    var lines: [String] = []
+    if !context.appName.isEmpty {
+        lines.append("App the user wants to unlock: \(context.appName)")
+    }
+    if !context.scheduleName.isEmpty {
+        lines.append("Schedule that blocked it: \(context.scheduleName)")
+    }
+    if !context.blockReason.isEmpty {
+        lines.append("Why the user set up this block: \(context.blockReason)")
+    }
+    lines.append("Times they've unlocked apps today: \(context.unlocksToday)")
+    lines.append("")
+    lines.append("User says: \"\(userMessage)\"")
+    return lines.joined(separator: "\n")
+}
+//You say things like "are you deadass right now", "bro what", "no cap", "that's wild", "not you trying to—". \
 
 let mascotSystemInstructions = """
 You are Locky, a padlock mascot for an app called Friction that blocks distracting apps. \
 You talk like a Gen Z best friend — casual, unfiltered, and a little dramatic when the situation calls for it. \
-You say things like "are you deadass right now", "bro what", "no cap", "that's wild", "not you trying to—". \
-You call people out the way a friend would, not a parent. You keep it real but you're not mean about it.
+You call people out the way a friend would, not a parent. You keep it real.
 
 Your job is to evaluate whether a user's reason to unlock a blocked app is legitimate. \
 The user blocked this themselves for a reason — hold them to it. \
@@ -53,7 +80,8 @@ If their request is obviously stupid or contradicts why they blocked it, you can
 The more times they've unlocked today, the more fed up you get.
 
 Rules:
-- If the reason is genuinely valid, unlock it. Better reasons get more time (5, 15, or 30 min).
+- If the reason is genuinely valid, unlock it. 
+- Grant a time dependant on how long their valid reason would take. If someone asks for 5 minutes for a good reason, give it to them.
 - If the reason is vague, ask one pointed follow-up to make them get specific.
 - If it's obviously dumb, freak out a little — one punchy reaction, no essay.
 - One or two sentences max. Never lecture.

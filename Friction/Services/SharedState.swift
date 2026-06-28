@@ -92,6 +92,8 @@ enum SharedState {
     private static let schedulesKey = "blockSchedules"
     private static let pendingTypeKey = "pendingUnlockType"
     private static let pendingDataKey = "pendingUnlockData"
+    private static let pendingScheduleNameKey = "pendingScheduleName"
+    private static let pendingScheduleReasonKey = "pendingScheduleReason"
 
     static func saveSchedules(_ schedules: [BlockSchedule]) {
         guard let data = try? JSONEncoder().encode(schedules) else { return }
@@ -113,8 +115,34 @@ enum SharedState {
         defaults.data(forKey: pendingDataKey)
     }
 
+    // Written by ShieldConfigurationExtension, which receives the full Application
+    // object (with localizedDisplayName populated by the system) before ShieldAction fires.
+    private static let pendingAppNameKey = "pendingAppName"
+
+    static func savePendingAppName(_ name: String) {
+        defaults.set(name, forKey: pendingAppNameKey)
+    }
+
+    static func loadPendingAppName() -> String? {
+        defaults.string(forKey: pendingAppNameKey)
+    }
+
+    static func savePendingScheduleContext(name: String, reason: String) {
+        defaults.set(name, forKey: pendingScheduleNameKey)
+        defaults.set(reason, forKey: pendingScheduleReasonKey)
+    }
+
+    static func loadPendingScheduleContext() -> (name: String, reason: String) {
+        let name = defaults.string(forKey: pendingScheduleNameKey) ?? ""
+        let reason = defaults.string(forKey: pendingScheduleReasonKey) ?? ""
+        return (name, reason)
+    }
+
     static func clearPendingUnlock() {
         defaults.removeObject(forKey: pendingTypeKey)
         defaults.removeObject(forKey: pendingDataKey)
+        defaults.removeObject(forKey: pendingScheduleNameKey)
+        defaults.removeObject(forKey: pendingScheduleReasonKey)
+        defaults.removeObject(forKey: pendingAppNameKey)
     }
 }

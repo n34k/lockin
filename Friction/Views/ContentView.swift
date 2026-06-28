@@ -11,9 +11,12 @@ import ManagedSettings
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.scenePhase) private var scenePhase
     @State private var schedules = SharedState.loadSchedules()
     @State private var isAuthorized = false
     @State private var editingSchedule: BlockSchedule? = nil
+    @State private var blockedApps: Set<ApplicationToken> = []
+    @State private var blockedCategories: Set<ActivityCategoryToken> = []
 
     var body: some View {
         NavigationStack {
@@ -39,6 +42,12 @@ struct ContentView: View {
             isAuthorized = AuthorizationCenter.shared.authorizationStatus == .approved
             ScheduleEngine.shared.apply(schedules)
             syncShields()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                schedules = SharedState.loadSchedules()
+                syncShields()
+            }
         }
         .sheet(item: $editingSchedule) { schedule in
             ScheduleEditorView(schedule: schedule) { updated in
@@ -77,17 +86,34 @@ struct ContentView: View {
             )
         } else {
             List {
-                ForEach(Array(schedules.enumerated()), id: \.element.id) { idx, schedule in
-                    ScheduleRow(schedule: schedule) {
-                        editingSchedule = schedule
-                    } onToggle: {
-                        schedules[idx].isEnabled.toggle()
-                        commit()
+                if !blockedApps.isEmpty || !blockedCategories.isEmpty {
+                    Section("Currently blocking") {
+                        ForEach(Array(blockedApps), id: \.self) { token in
+                            Button { initiateUnlock(app: token) } label: {
+                                BlockedAppRow(token: token)
+                            }
+                        }
+                        ForEach(Array(blockedCategories), id: \.self) { token in
+                            Button { initiateUnlock(category: token) } label: {
+                                BlockedCategoryRow(token: token)
+                            }
+                        }
                     }
                 }
-                .onDelete { indexSet in
-                    schedules.remove(atOffsets: indexSet)
-                    commit()
+
+                Section("Schedules") {
+                    ForEach(Array(schedules.enumerated()), id: \.element.id) { idx, schedule in
+                        ScheduleRow(schedule: schedule, isActive: schedule.isCurrentlyActive()) {
+                            editingSchedule = schedule
+                        } onToggle: {
+                            schedules[idx].isEnabled.toggle()
+                            commit()
+                        }
+                    }
+                    .onDelete { indexSet in
+                        schedules.remove(atOffsets: indexSet)
+                        commit()
+                    }
                 }
             }
         }
@@ -114,6 +140,8 @@ struct ContentView: View {
         if active.isEmpty {
             store.shield.applications = nil
             store.shield.applicationCategories = nil
+            blockedApps = []
+            blockedCategories = []
             return
         }
         var apps: Set<ApplicationToken> = []
@@ -124,17 +152,48 @@ struct ContentView: View {
         }
         store.shield.applications = apps.isEmpty ? nil : apps
         store.shield.applicationCategories = categories.isEmpty ? nil : .specific(categories, except: [])
+        blockedApps = apps
+        blockedCategories = categories
+    }
+
+    private func initiateUnlock(app: ApplicationToken) {
+        let active = schedules.filter { $0.isCurrentlyActive() }
+        let match = active.first { $0.selection.applicationTokens.contains(app) } ?? active.first
+        appState.pendingUnlockApp = app
+        appState.pendingUnlockCategory = nil
+        appState.pendingAppName = SharedState.loadPendingAppName() ?? ""
+        appState.pendingScheduleName = match?.name ?? ""
+        appState.pendingScheduleReason = match?.reason ?? ""
+        appState.showingUnlock = true
+    }
+
+    private func initiateUnlock(category: ActivityCategoryToken) {
+        let active = schedules.filter { $0.isCurrentlyActive() }
+        let match = active.first { $0.selection.categoryTokens.contains(category) } ?? active.first
+        appState.pendingUnlockApp = nil
+        appState.pendingUnlockCategory = category
+        appState.pendingAppName = SharedState.loadPendingAppName() ?? ""
+        appState.pendingScheduleName = match?.name ?? ""
+        appState.pendingScheduleReason = match?.reason ?? ""
+        appState.showingUnlock = true
     }
 }
 
 private struct ScheduleRow: View {
     let schedule: BlockSchedule
+    let isActive: Bool
     let onTap: () -> Void
     let onToggle: () -> Void
 
     var body: some View {
         Button(action: onTap) {
-            HStack {
+            HStack(spacing: 12) {
+                // Active indicator dot
+                Circle()
+                    .fill(isActive ? .orange : .clear)
+                    .frame(width: 8, height: 8)
+                    .animation(.easeInOut, value: isActive)
+
                 VStack(alignment: .leading, spacing: 3) {
                     Text(schedule.name)
                         .font(.headline)
@@ -143,9 +202,15 @@ private struct ScheduleRow: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     if let summary = schedule.selectionSummary {
-                        Text("\(summary) blocked")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                        if isActive {
+                            Text("Blocking now — \(summary)")
+                                .font(.caption)
+                                .foregroundStyle(Color.orange)
+                        } else {
+                            Text("\(summary) blocked")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
                 Spacer()
@@ -155,6 +220,36 @@ private struct ScheduleRow: View {
                 ))
                 .labelsHidden()
             }
+        }
+    }
+}
+
+private struct BlockedAppRow: View {
+    let token: ApplicationToken
+
+    var body: some View {
+        HStack {
+            Label(token)
+                .foregroundStyle(.primary)
+            Spacer()
+            Text("Unlock")
+                .font(.subheadline)
+                .foregroundStyle(.orange)
+        }
+    }
+}
+
+private struct BlockedCategoryRow: View {
+    let token: ActivityCategoryToken
+
+    var body: some View {
+        HStack {
+            Label(token)
+                .foregroundStyle(.primary)
+            Spacer()
+            Text("Unlock")
+                .font(.subheadline)
+                .foregroundStyle(.orange)
         }
     }
 }

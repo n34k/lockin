@@ -5,9 +5,9 @@ import Playgrounds
 #Playground {
     let context = UnlockContext(
         appName: "Instagram",
-        userOccupation: "Student",
-        unlocksToday: 5,
-        blockReason: "Stay focused during work hours"
+        scheduleName: "Work Focus",
+        blockReason: "Stay focused during work hours",
+        unlocksToday: 5
     )
 
     let session = LanguageModelSession {

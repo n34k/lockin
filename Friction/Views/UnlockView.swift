@@ -16,6 +16,23 @@ struct UnlockView: View {
 
     var body: some View {
         VStack(spacing: 32) {
+            if !showingSuccess {
+                HStack {
+                    Spacer()
+                    Button {
+                        appState.pendingUnlockApp = nil
+                        appState.pendingUnlockCategory = nil
+                        SharedState.clearPendingUnlock()
+                        appState.showingUnlock = false
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+            }
             Spacer()
             if showingSuccess {
                 VStack(spacing: 16) {
