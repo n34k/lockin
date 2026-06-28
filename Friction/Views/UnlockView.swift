@@ -1,5 +1,6 @@
 import SwiftUI
 import ManagedSettings
+import FamilyControls
 
 // Swap this one line to change the unlock strategy:
 typealias ActiveUnlockChallenge = MascotChallenge
@@ -15,8 +16,25 @@ struct UnlockView: View {
     @State private var unlockDuration: Int? = nil
 
     var body: some View {
-        VStack(spacing: 32) {
-            if !showingSuccess {
+        VStack(spacing: 0) {
+            if showingSuccess {
+                Spacer()
+                VStack(spacing: 16) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 72))
+                        .foregroundStyle(.green)
+                    Text("Fine. You're in.")
+                        .font(.title.bold())
+                    if let duration = unlockDuration {
+                        Text("You have \(duration) minute\(duration == 1 ? "" : "s").")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .transition(.scale.combined(with: .opacity))
+                Spacer()
+            } else {
+                // Close button
                 HStack {
                     Spacer()
                     Button {
@@ -31,30 +49,30 @@ struct UnlockView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.horizontal)
-            }
-            Spacer()
-            if showingSuccess {
-                VStack(spacing: 16) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 72))
-                        .foregroundStyle(.green)
-                    Text("Fine. You're in.")
-                        .font(.title.bold())
-                    if let duration = unlockDuration {
-                        Text("You have \(duration) minute\(duration == 1 ? "" : "s").")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .transition(.scale.combined(with: .opacity))
-            } else {
+                .padding([.horizontal, .top])
+
+                // App name header
+                appLabel
+                    .font(.headline)
+                    .padding(.top, 12)
+                    .padding(.horizontal, 24)
+
+                // Challenge fills remaining space
                 ActiveUnlockChallenge(onUnlock: handleUnlock)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            Spacer()
         }
-        .padding()
+        .presentationDetents([.large])
         .interactiveDismissDisabled(true)
+    }
+
+    @ViewBuilder
+    private var appLabel: some View {
+        if let app = appState.pendingUnlockApp {
+            Label(app)
+        } else if let category = appState.pendingUnlockCategory {
+            Label(category)
+        }
     }
 
     private func handleUnlock(_ duration: Int?) {

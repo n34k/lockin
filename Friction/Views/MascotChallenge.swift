@@ -11,6 +11,7 @@ struct MascotChallenge: UnlockChallenge {
     @State private var followUpQuestion: String? = nil
     @State private var didUnlock = false
     @State private var isLoading = false
+    @FocusState private var inputFocused: Bool
     @State private var session = LanguageModelSession {
         Instructions(mascotSystemInstructions)
     }
@@ -20,57 +21,54 @@ struct MascotChallenge: UnlockChallenge {
     }
 
     var body: some View {
-        VStack(spacing: 24) {
-            appLabel
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            Spacer()
 
-            if isLoading && mascotDialogue == nil {
-                ProgressView()
-            } else if let dialogue = mascotDialogue {
-                Text(dialogue)
-                    .font(.title3)
-                    .multilineTextAlignment(.center)
-                    .transition(.opacity)
-            }
+            VStack(spacing: 20) {
+                if isLoading && mascotDialogue == nil {
+                    ProgressView()
+                } else if let dialogue = mascotDialogue {
+                    VStack(spacing: 10) {
+                        Text(dialogue)
+                            .font(.title3)
+                            .multilineTextAlignment(.center)
 
-            if let question = followUpQuestion {
-                Text(question)
-                    .font(.subheadline)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-                    .transition(.opacity)
-            }
-
-            if isLoading && mascotDialogue != nil {
-                ProgressView()
-            } else if !didUnlock && mascotDialogue != nil {
-                VStack(spacing: 12) {
-                    TextField("Give me a reason...", text: $userMessage, axis: .vertical)
-                        .textFieldStyle(.roundedBorder)
-                        .lineLimit(3)
-                        .padding(.horizontal, 32)
-
-                    Button("Send it") {
-                        Task { await sendMessage() }
+                        if let question = followUpQuestion {
+                            Text(question)
+                                .font(.subheadline)
+                                .multilineTextAlignment(.center)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(userMessage.isEmpty)
+                    .transition(.opacity)
+                }
+
+                if !didUnlock && mascotDialogue != nil {
+                    if isLoading {
+                        ProgressView()
+                    } else {
+                        VStack(spacing: 14) {
+                            TextField("Give me a reason...", text: $userMessage, axis: .vertical)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.body)
+                                .lineLimit(4...8)
+                                .focused($inputFocused)
+
+                            Button("Send it") {
+                                Task { await sendMessage() }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .frame(maxWidth: .infinity)
+                            .disabled(userMessage.isEmpty)
+                        }
+                    }
                 }
             }
+            .padding(.horizontal, 24)
+
+            Spacer()
         }
         .task { await resolveNameThenOpen() }
-    }
-
-    @ViewBuilder
-    private var appLabel: some View {
-        if let app = appState.pendingUnlockApp {
-            Label(app)
-        } else if let category = appState.pendingUnlockCategory {
-            Label(category)
-        } else {
-            EmptyView()
-        }
     }
 
     private var unlockContext: UnlockContext {
@@ -102,6 +100,7 @@ struct MascotChallenge: UnlockChallenge {
         isLoading = false
         if let dialogue = result?.content.dialogue {
             withAnimation { mascotDialogue = dialogue }
+            inputFocused = true
         }
     }
 
