@@ -31,8 +31,6 @@ struct UnlockContext {
 }
 
 func buildOpenerPrompt(context: UnlockContext) -> String {
-    print("Context: \(context)")
-
     var lines: [String] = []
     if !context.appName.isEmpty {
         lines.append("App the user wants to unlock: \(context.appName)")
@@ -50,8 +48,6 @@ func buildOpenerPrompt(context: UnlockContext) -> String {
 }
 
 func buildUnlockPrompt(userMessage: String, context: UnlockContext) -> String {
-    print("Context: \(context)")
-    
     var lines: [String] = []
     if !context.appName.isEmpty {
         lines.append("App the user wants to unlock: \(context.appName)")

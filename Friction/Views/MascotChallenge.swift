@@ -17,6 +17,7 @@ struct MascotChallenge: UnlockChallenge {
     init(onUnlock: @escaping (Int?) -> Void) {
         self.onUnlock = onUnlock
         let instructions = buildMascotSystemInstructions(profile: SharedState.loadUserProfile())
+        print("=== [Friction] SYSTEM INSTRUCTIONS ===\n\(instructions)\n=======================================")
         self._session = State(wrappedValue: LanguageModelSession {
             Instructions(instructions)
         })
@@ -24,7 +25,7 @@ struct MascotChallenge: UnlockChallenge {
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer()
+            Spacer(minLength: 0)
 
             VStack(spacing: 20) {
                 if isLoading && mascotDialogue == nil {
@@ -34,12 +35,14 @@ struct MascotChallenge: UnlockChallenge {
                         Text(dialogue)
                             .font(.title3)
                             .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
 
                         if let question = followUpQuestion {
                             Text(question)
                                 .font(.subheadline)
                                 .multilineTextAlignment(.center)
                                 .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .transition(.opacity)
@@ -68,7 +71,7 @@ struct MascotChallenge: UnlockChallenge {
             }
             .padding(.horizontal, 24)
 
-            Spacer()
+            Spacer(minLength: 0)
         }
         .task { await resolveNameThenOpen() }
     }
@@ -95,8 +98,10 @@ struct MascotChallenge: UnlockChallenge {
 
     private func fireOpener() async {
         isLoading = true
+        let openerPrompt = buildOpenerPrompt(context: unlockContext)
+        print("=== [Friction] OPENER PROMPT ===\n\(openerPrompt)\n================================")
         let result = try? await session.respond(
-            to: buildOpenerPrompt(context: unlockContext),
+            to: openerPrompt,
             generating: MascotResponse.self
         )
         isLoading = false
@@ -111,8 +116,10 @@ struct MascotChallenge: UnlockChallenge {
         userMessage = ""
         isLoading = true
 
+        let unlockPrompt = buildUnlockPrompt(userMessage: message, context: unlockContext)
+        print("=== [Friction] UNLOCK PROMPT ===\n\(unlockPrompt)\n================================")
         let result = try? await session.respond(
-            to: buildUnlockPrompt(userMessage: message, context: unlockContext),
+            to: unlockPrompt,
             generating: MascotResponse.self
         )
 
