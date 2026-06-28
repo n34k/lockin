@@ -2,7 +2,7 @@ import SwiftUI
 import FoundationModels
 
 struct MascotChallenge: UnlockChallenge {
-    let onUnlock: () -> Void
+    let onUnlock: (Int?) -> Void
 
     @State private var userMessage = ""
     @State private var mascotDialogue: String? = nil
@@ -13,7 +13,7 @@ struct MascotChallenge: UnlockChallenge {
         Instructions(mascotSystemInstructions)
     }
 
-    init(onUnlock: @escaping () -> Void) {
+    init(onUnlock: @escaping (Int?) -> Void) {
         self.onUnlock = onUnlock
     }
 
@@ -75,7 +75,7 @@ struct MascotChallenge: UnlockChallenge {
         if content.shouldUnlock {
             didUnlock = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                onUnlock()
+                onUnlock(content.unlockDurationMinutes)
             }
         }
     }

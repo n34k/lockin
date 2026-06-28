@@ -1,13 +1,13 @@
 import SwiftUI
 
 struct MathChallenge: UnlockChallenge {
-    let onUnlock: () -> Void
+    let onUnlock: (Int?) -> Void
 
     @State private var problem = MathProblem.random()
     @State private var answer = ""
     @State private var showingWrong = false
 
-    init(onUnlock: @escaping () -> Void) {
+    init(onUnlock: @escaping (Int?) -> Void) {
         self.onUnlock = onUnlock
     }
 
@@ -39,7 +39,7 @@ struct MathChallenge: UnlockChallenge {
 
             Button("Submit") {
                 if answer == "\(problem.a + problem.b)" {
-                    onUnlock()
+                    onUnlock(nil)
                 } else {
                     withAnimation { showingWrong = true }
                     answer = ""

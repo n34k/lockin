@@ -6,12 +6,13 @@ typealias ActiveUnlockChallenge = MascotChallenge
 // typealias ActiveUnlockChallenge = MathChallenge
 
 protocol UnlockChallenge: View {
-    init(onUnlock: @escaping () -> Void)
+    init(onUnlock: @escaping (Int?) -> Void)
 }
 
 struct UnlockView: View {
     @EnvironmentObject var appState: AppState
     @State private var showingSuccess = false
+    @State private var unlockDuration: Int? = nil
 
     var body: some View {
         VStack(spacing: 32) {
@@ -23,6 +24,11 @@ struct UnlockView: View {
                         .foregroundStyle(.green)
                     Text("Fine. You're in.")
                         .font(.title.bold())
+                    if let duration = unlockDuration {
+                        Text("You have \(duration) minute\(duration == 1 ? "" : "s").")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .transition(.scale.combined(with: .opacity))
             } else {
@@ -34,7 +40,8 @@ struct UnlockView: View {
         .interactiveDismissDisabled(true)
     }
 
-    private func handleUnlock() {
+    private func handleUnlock(_ duration: Int?) {
+        unlockDuration = duration
         unlockTargeted()
         withAnimation { showingSuccess = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
