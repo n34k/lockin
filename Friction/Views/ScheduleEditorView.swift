@@ -84,6 +84,7 @@ struct ScheduleEditorView: View {
                         onSave(schedule)
                         dismiss()
                     }
+                    .disabled(!canSave)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -91,6 +92,13 @@ struct ScheduleEditorView: View {
             }
             .familyActivityPicker(isPresented: $isPickerPresented, selection: $schedule.selection)
         }
+    }
+
+    private var canSave: Bool {
+        !schedule.name.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !schedule.activeDays.isEmpty &&
+        (schedule.selection.applicationTokens.count + schedule.selection.categoryTokens.count) > 0 &&
+        !schedule.reason.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     private func commitTimes() {

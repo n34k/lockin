@@ -37,10 +37,10 @@ struct BlockSchedule: Codable, Identifiable {
 
     init(
         id: UUID = UUID(),
-        name: String = "New Schedule",
+        name: String = "",
         startHour: Int = 9, startMinute: Int = 0,
         endHour: Int = 17, endMinute: Int = 0,
-        activeDays: Set<Int> = [2, 3, 4, 5, 6],
+        activeDays: Set<Int> = [],
         isEnabled: Bool = true,
         selection: FamilyActivitySelection = FamilyActivitySelection(),
         reason: String = ""
