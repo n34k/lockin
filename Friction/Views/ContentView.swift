@@ -15,8 +15,8 @@ struct ContentView: View {
     @State private var isPickerPresented = false
     @State private var selection = FamilyActivitySelection()
     @State private var isAuthorized = false
-
-    private let activityCenter = DeviceActivityCenter()
+    @State private var schedule = SharedState.loadSchedule()
+    @State private var showingScheduleEditor = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -33,8 +33,12 @@ struct ContentView: View {
             } else {
                 Text("Friction is active.")
                     .font(.headline)
-                Text("\(selection.applicationTokens.count + selection.categoryTokens.count) item(s) blocked 9am–5pm")
+                Text(schedule.displaySummary)
                     .foregroundStyle(.secondary)
+                Button("Edit schedule") {
+                    showingScheduleEditor = true
+                }
+                .buttonStyle(.bordered)
                 Button("Change blocked apps") {
                     isPickerPresented = true
                 }
@@ -45,11 +49,20 @@ struct ContentView: View {
         .familyActivityPicker(isPresented: $isPickerPresented, selection: $selection)
         .onChange(of: selection) { _, newValue in
             SharedState.saveSelection(newValue)
-            applyShieldNow(newValue)
-            startMonitoring()
+            syncShields()
         }
         .onAppear {
             isAuthorized = AuthorizationCenter.shared.authorizationStatus == .approved
+            if let saved = SharedState.loadSelection() { selection = saved }
+            ScheduleEngine.shared.apply(schedule)
+            syncShields()
+        }
+        .sheet(isPresented: $showingScheduleEditor) {
+            ScheduleEditorView(schedule: $schedule) {
+                SharedState.saveSchedule(schedule)
+                ScheduleEngine.shared.apply(schedule)
+                syncShields()
+            }
         }
         .sheet(isPresented: $appState.showingUnlock) {
             UnlockView()
@@ -57,20 +70,17 @@ struct ContentView: View {
         }
     }
 
-    private func applyShieldNow(_ selection: FamilyActivitySelection) {
+    private func syncShields() {
         let store = ManagedSettingsStore()
-        store.shield.applications = selection.applicationTokens.isEmpty ? nil : selection.applicationTokens
-        store.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens, except: [])
-    }
-
-    private func startMonitoring() {
-        let schedule = DeviceActivitySchedule(
-            intervalStart: DateComponents(hour: 9, minute: 0),
-            intervalEnd: DateComponents(hour: 17, minute: 0),
-            repeats: true
-        )
-        activityCenter.stopMonitoring([.work])
-        try? activityCenter.startMonitoring(.work, during: schedule)
+        if schedule.isCurrentlyActive() {
+            let sel = SharedState.loadSelection()
+            store.shield.applications = sel?.applicationTokens.isEmpty == false ? sel!.applicationTokens : nil
+            store.shield.applicationCategories = sel?.categoryTokens.isEmpty == false
+                ? .specific(sel!.categoryTokens, except: []) : nil
+        } else {
+            store.shield.applications = nil
+            store.shield.applicationCategories = nil
+        }
     }
 }
 

@@ -14,6 +14,7 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
     override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
+        guard activity.rawValue.hasPrefix("friction.schedule.") else { return }
         guard let selection = SharedState.loadSelection() else { return }
         if !selection.applicationTokens.isEmpty {
             store.shield.applications = selection.applicationTokens
@@ -25,6 +26,7 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
+        guard activity.rawValue.hasPrefix("friction.schedule.") else { return }
         store.shield.applications = nil
         store.shield.applicationCategories = nil
     }
