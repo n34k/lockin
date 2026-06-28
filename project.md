@@ -197,8 +197,8 @@ else                                 { use OnDeviceBrain } // free default, $0 t
 ## 7. Open Decisions (parking lot)
 
 - **App name** — "Friction" is taken. Need a name that signals the funny/antagonistic angle.
-- **Mascot design** — leading lanes: the **blob/gremlin** (cheapest to animate, most expressive, most memeable, lowest art barrier — recommended) vs the **grumpy cat** (instant personality shorthand, more animation constraints). Sketch both; pick whichever's voice comes naturally.
-- **Mascot voice spec** — comedic register, how sass escalates with begging, lines that are funny-shareable without tipping into mean.
+- **Mascot design** — **decided: Locky, a small animated lock.** Full character design in [`locky.md`](locky.md). Art direction (expression range, animation style) still TBD.
+- **Mascot voice spec** — **decided: disappointed father, not roast comedian.** Empathy-first, escalates to judgment with repeat unlocks, always grants access eventually. See [`locky.md`](locky.md) for escalation rules and voice guidelines.
 - **Puzzle types** (for v1 friction and as a fallback/alt mode).
 - **Re-lock timing rules** beyond the dumb day-boundary default.
 

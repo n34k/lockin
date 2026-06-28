@@ -12,17 +12,40 @@
 		<key>Friction.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>0</integer>
+			<integer>3</integer>
 		</dict>
 		<key>Shield Action.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>3</integer>
+			<integer>0</integer>
 		</dict>
 		<key>Shield Configuration.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
 			<integer>2</integer>
+		</dict>
+	</dict>
+	<key>SuppressBuildableAutocreation</key>
+	<dict>
+		<key>260AD3CC2FEF6EBB00826D47</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>260AD3FA2FEF6F2A00826D47</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>260AD40F2FEF6F7900826D47</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>260AD4242FEF6FAE00826D47</key>
+		<dict>
+			<key>primary</key>
+			<true/>
 		</dict>
 	</dict>
 </dict>
