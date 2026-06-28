@@ -8,6 +8,7 @@
 import SwiftUI
 import FamilyControls
 import DeviceActivity
+import ManagedSettings
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
@@ -44,6 +45,7 @@ struct ContentView: View {
         .familyActivityPicker(isPresented: $isPickerPresented, selection: $selection)
         .onChange(of: selection) { _, newValue in
             SharedState.saveSelection(newValue)
+            applyShieldNow(newValue)
             startMonitoring()
         }
         .onAppear {
@@ -53,6 +55,12 @@ struct ContentView: View {
             UnlockView()
                 .environmentObject(appState)
         }
+    }
+
+    private func applyShieldNow(_ selection: FamilyActivitySelection) {
+        let store = ManagedSettingsStore()
+        store.shield.applications = selection.applicationTokens.isEmpty ? nil : selection.applicationTokens
+        store.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens, except: [])
     }
 
     private func startMonitoring() {

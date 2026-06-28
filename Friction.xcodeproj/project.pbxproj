@@ -14,6 +14,8 @@
 		260AD41C2FEF6F7A00826D47 /* Shield Configuration.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 260AD4102FEF6F7900826D47 /* Shield Configuration.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		260AD4262FEF6FAE00826D47 /* ManagedSettings.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 260AD4112FEF6F7A00826D47 /* ManagedSettings.framework */; };
 		260AD42E2FEF6FAE00826D47 /* Shield Action.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 260AD4252FEF6FAE00826D47 /* Shield Action.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		268136222FF0C99F00FF0962 /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 268136212FF0C99E00FF0962 /* FoundationModels.framework */; };
+		268136252FF0CA1100826D47 /* SharedState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 268136242FF0CA1100826D47 /* SharedState.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -80,6 +82,8 @@
 		260AD4112FEF6F7A00826D47 /* ManagedSettings.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ManagedSettings.framework; path = System/Library/Frameworks/ManagedSettings.framework; sourceTree = SDKROOT; };
 		260AD4132FEF6F7A00826D47 /* ManagedSettingsUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ManagedSettingsUI.framework; path = System/Library/Frameworks/ManagedSettingsUI.framework; sourceTree = SDKROOT; };
 		260AD4252FEF6FAE00826D47 /* Shield Action.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Shield Action.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		268136212FF0C99E00FF0962 /* FoundationModels.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FoundationModels.framework; path = System/Library/Frameworks/FoundationModels.framework; sourceTree = SDKROOT; };
+		268136242FF0CA1100826D47 /* SharedState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SharedState.swift; path = Friction/Services/SharedState.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -104,21 +108,11 @@
 			);
 			target = 260AD4242FEF6FAE00826D47 /* Shield Action */;
 		};
-		260AD4372FF030E700826D47 /* Exceptions for "Friction" folder in "Device Activity Monitor" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				SharedState.swift,
-			);
-			target = 260AD3FA2FEF6F2A00826D47 /* Device Activity Monitor */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		260AD3CF2FEF6EBB00826D47 /* Friction */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				260AD4372FF030E700826D47 /* Exceptions for "Friction" folder in "Device Activity Monitor" target */,
-			);
 			path = Friction;
 			sourceTree = "<group>";
 		};
@@ -163,6 +157,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				268136222FF0C99F00FF0962 /* FoundationModels.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -219,6 +214,7 @@
 				260AD4272FEF6FAE00826D47 /* Shield Action */,
 				260AD3FC2FEF6F2C00826D47 /* Frameworks */,
 				260AD3CE2FEF6EBB00826D47 /* Products */,
+				268136982FF0CB7300FF0962 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -238,11 +234,20 @@
 		260AD3FC2FEF6F2C00826D47 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				268136212FF0C99E00FF0962 /* FoundationModels.framework */,
 				260AD3FD2FEF6F2C00826D47 /* DeviceActivity.framework */,
 				260AD4112FEF6F7A00826D47 /* ManagedSettings.framework */,
 				260AD4132FEF6F7A00826D47 /* ManagedSettingsUI.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		268136982FF0CB7300FF0962 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				268136242FF0CA1100826D47 /* SharedState.swift */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -513,6 +518,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				268136252FF0CA1100826D47 /* SharedState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
