@@ -15,19 +15,29 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
         guard activity.rawValue.hasPrefix("friction.schedule.") else { return }
-        guard let selection = SharedState.loadSelection() else { return }
-        if !selection.applicationTokens.isEmpty {
-            store.shield.applications = selection.applicationTokens
-        }
-        if !selection.categoryTokens.isEmpty {
-            store.shield.applicationCategories = .specific(selection.categoryTokens, except: [])
-        }
+        applyActiveShields()
     }
 
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
         guard activity.rawValue.hasPrefix("friction.schedule.") else { return }
-        store.shield.applications = nil
-        store.shield.applicationCategories = nil
+        applyActiveShields()
+    }
+
+    private func applyActiveShields() {
+        let active = SharedState.loadSchedules().filter { $0.isCurrentlyActive() }
+        if active.isEmpty {
+            store.shield.applications = nil
+            store.shield.applicationCategories = nil
+            return
+        }
+        var apps: Set<ApplicationToken> = []
+        var categories: Set<ActivityCategoryToken> = []
+        for s in active {
+            apps.formUnion(s.selection.applicationTokens)
+            categories.formUnion(s.selection.categoryTokens)
+        }
+        store.shield.applications = apps.isEmpty ? nil : apps
+        store.shield.applicationCategories = categories.isEmpty ? nil : .specific(categories, except: [])
     }
 }

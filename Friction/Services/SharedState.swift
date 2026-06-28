@@ -7,35 +7,72 @@ let appGroupID = "group.ndenterprises.Friction"
 extension DeviceActivityName {
     static let work = Self("friction.work")
 
-    static func schedule(for weekday: Int) -> DeviceActivityName {
-        Self("friction.schedule.\(weekday)")
+    static func schedule(id: UUID, weekday: Int) -> DeviceActivityName {
+        Self("friction.schedule.\(id.uuidString).\(weekday)")
     }
 }
 
-struct BlockSchedule: Codable {
+struct BlockSchedule: Codable, Identifiable {
+    var id: UUID
+    var name: String
     var startHour: Int
     var startMinute: Int
     var endHour: Int
     var endMinute: Int
     var activeDays: Set<Int>  // Calendar weekday: 1=Sun … 7=Sat
     var isEnabled: Bool
+    var selection: FamilyActivitySelection
 
-    static let `default` = BlockSchedule(
-        startHour: 9, startMinute: 0,
-        endHour: 17, endMinute: 0,
-        activeDays: [2, 3, 4, 5, 6],  // Mon–Fri
-        isEnabled: false
-    )
+    // Why the user is blocking apps during this schedule.
+    // Loki reads this to hold them accountable when they try to unlock.
+    var reason: String
 
-    var displaySummary: String {
-        guard isEnabled else { return "Schedule off" }
-        let abbr = ["", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-        let days = (1...7).filter { activeDays.contains($0) }.map { abbr[$0] }.joined(separator: " ")
+    init(
+        id: UUID = UUID(),
+        name: String = "New Schedule",
+        startHour: Int = 9, startMinute: Int = 0,
+        endHour: Int = 17, endMinute: Int = 0,
+        activeDays: Set<Int> = [2, 3, 4, 5, 6],
+        isEnabled: Bool = true,
+        selection: FamilyActivitySelection = FamilyActivitySelection(),
+        reason: String = ""
+    ) {
+        self.id = id
+        self.name = name
+        self.startHour = startHour
+        self.startMinute = startMinute
+        self.endHour = endHour
+        self.endMinute = endMinute
+        self.activeDays = activeDays
+        self.isEnabled = isEnabled
+        self.selection = selection
+        self.reason = reason
+    }
+
+    var timeSummary: String {
         let fmt = DateFormatter()
         fmt.dateFormat = "h:mm a"
         let s = Calendar.current.date(from: DateComponents(hour: startHour, minute: startMinute))!
         let e = Calendar.current.date(from: DateComponents(hour: endHour,   minute: endMinute))!
-        return "\(days), \(fmt.string(from: s)) – \(fmt.string(from: e))"
+        return "\(fmt.string(from: s)) – \(fmt.string(from: e))"
+    }
+
+    var daysSummary: String {
+        if activeDays.count == 7 { return "Every day" }
+        if activeDays == [2, 3, 4, 5, 6] { return "Weekdays" }
+        if activeDays == [1, 7] { return "Weekends" }
+        let abbr = ["", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        return (1...7).filter { activeDays.contains($0) }.map { abbr[$0] }.joined(separator: " ")
+    }
+
+    var selectionSummary: String? {
+        let apps = selection.applicationTokens.count
+        let cats = selection.categoryTokens.count
+        guard apps > 0 || cats > 0 else { return nil }
+        var parts: [String] = []
+        if apps > 0 { parts.append("\(apps) app\(apps == 1 ? "" : "s")") }
+        if cats > 0 { parts.append("\(cats) categor\(cats == 1 ? "y" : "ies")") }
+        return parts.joined(separator: ", ")
     }
 
     func isCurrentlyActive() -> Bool {
@@ -52,31 +89,20 @@ struct BlockSchedule: Codable {
 
 enum SharedState {
     private static let defaults = UserDefaults(suiteName: appGroupID)!
-    private static let selectionKey = "blockedApps"
+    private static let schedulesKey = "blockSchedules"
     private static let pendingTypeKey = "pendingUnlockType"
     private static let pendingDataKey = "pendingUnlockData"
-    private static let scheduleKey = "blockSchedule"
 
-    static func saveSelection(_ selection: FamilyActivitySelection) {
-        guard let data = try? JSONEncoder().encode(selection) else { return }
-        defaults.set(data, forKey: selectionKey)
+    static func saveSchedules(_ schedules: [BlockSchedule]) {
+        guard let data = try? JSONEncoder().encode(schedules) else { return }
+        defaults.set(data, forKey: schedulesKey)
     }
 
-    static func loadSelection() -> FamilyActivitySelection? {
-        guard let data = defaults.data(forKey: selectionKey) else { return nil }
-        return try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
-    }
-
-    static func saveSchedule(_ schedule: BlockSchedule) {
-        guard let data = try? JSONEncoder().encode(schedule) else { return }
-        defaults.set(data, forKey: scheduleKey)
-    }
-
-    static func loadSchedule() -> BlockSchedule {
-        guard let data = defaults.data(forKey: scheduleKey),
-              let s = try? JSONDecoder().decode(BlockSchedule.self, from: data)
-        else { return .default }
-        return s
+    static func loadSchedules() -> [BlockSchedule] {
+        guard let data = defaults.data(forKey: schedulesKey),
+              let schedules = try? JSONDecoder().decode([BlockSchedule].self, from: data)
+        else { return [] }
+        return schedules
     }
 
     static func loadPendingUnlockType() -> String? {

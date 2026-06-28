@@ -23,10 +23,10 @@ struct UnlockContext {
     let blockReason: String
 
     static let placeholder = UnlockContext(
-        appName: "this app",
-        userOccupation: "Student",
+        appName: "Instagram",
+        userOccupation: "Software engineer",
         unlocksToday: 0,
-        blockReason: "Stay focused"
+        blockReason: "Stay focused during work"
     )
 }
 

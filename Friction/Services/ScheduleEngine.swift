@@ -5,21 +5,29 @@ final class ScheduleEngine {
     static let shared = ScheduleEngine()
     private let center = DeviceActivityCenter()
 
-    private static let allNames: [DeviceActivityName] =
-        (1...7).map { .schedule(for: $0) } + [.work]
+    func apply(_ schedules: [BlockSchedule]) {
+        // Stop every activity that could be registered — old or new — to ensure a clean slate.
+        // We union the persisted (old) schedules and the incoming (new) ones so stale names get cleaned up.
+        let persisted = SharedState.loadSchedules()
+        let allRawNames = Set(
+            (persisted + schedules).flatMap { s in
+                (1...7).map { "friction.schedule.\(s.id.uuidString).\($0)" }
+            } + ["friction.work"]
+        )
+        center.stopMonitoring(allRawNames.map { DeviceActivityName($0) })
 
-    func apply(_ schedule: BlockSchedule) {
-        center.stopMonitoring(Self.allNames)
-        guard schedule.isEnabled && !schedule.activeDays.isEmpty else { return }
-        for weekday in schedule.activeDays {
-            let s = DeviceActivitySchedule(
-                intervalStart: DateComponents(
-                    hour: schedule.startHour, minute: schedule.startMinute, weekday: weekday),
-                intervalEnd: DateComponents(
-                    hour: schedule.endHour, minute: schedule.endMinute, weekday: weekday),
-                repeats: true
-            )
-            try? center.startMonitoring(.schedule(for: weekday), during: s)
+        for schedule in schedules where schedule.isEnabled && !schedule.activeDays.isEmpty {
+            for weekday in schedule.activeDays {
+                let name = DeviceActivityName.schedule(id: schedule.id, weekday: weekday)
+                let s = DeviceActivitySchedule(
+                    intervalStart: DateComponents(
+                        hour: schedule.startHour, minute: schedule.startMinute, weekday: weekday),
+                    intervalEnd: DateComponents(
+                        hour: schedule.endHour, minute: schedule.endMinute, weekday: weekday),
+                    repeats: true
+                )
+                try? center.startMonitoring(name, during: s)
+            }
         }
     }
 }

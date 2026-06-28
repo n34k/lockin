@@ -1,30 +1,31 @@
 import SwiftUI
+import FamilyControls
 
 struct ScheduleEditorView: View {
-    @Binding var schedule: BlockSchedule
-    var onSave: () -> Void
+    @State private var schedule: BlockSchedule
+    var onSave: (BlockSchedule) -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var startDate: Date
     @State private var endDate: Date
+    @State private var isPickerPresented = false
 
-    init(schedule: Binding<BlockSchedule>, onSave: @escaping () -> Void) {
-        _schedule = schedule
+    init(schedule: BlockSchedule, onSave: @escaping (BlockSchedule) -> Void) {
+        _schedule = State(initialValue: schedule)
         self.onSave = onSave
         let cal = Calendar.current
         _startDate = State(initialValue: cal.date(from: DateComponents(
-            hour: schedule.wrappedValue.startHour,
-            minute: schedule.wrappedValue.startMinute)) ?? Date())
+            hour: schedule.startHour, minute: schedule.startMinute)) ?? Date())
         _endDate = State(initialValue: cal.date(from: DateComponents(
-            hour: schedule.wrappedValue.endHour,
-            minute: schedule.wrappedValue.endMinute)) ?? Date())
+            hour: schedule.endHour, minute: schedule.endMinute)) ?? Date())
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Toggle("Enable schedule", isOn: $schedule.isEnabled)
+                    TextField("Name", text: $schedule.name)
+                    Toggle("Enabled", isOn: $schedule.isEnabled)
                 }
 
                 Section("Blocking hours") {
@@ -37,14 +38,50 @@ struct ScheduleEditorView: View {
                     DayToggleRow(activeDays: $schedule.activeDays)
                 }
                 .disabled(!schedule.isEnabled)
+
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "lock.fill")
+                                .foregroundStyle(.orange)
+                            Text("Why are you blocking these apps?")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                        }
+                        Text("Loki will use this to call you out when you try to unlock. Be honest — vague reasons get less mercy.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("e.g. Stay off social media while I work", text: $schedule.reason, axis: .vertical)
+                            .lineLimit(2...4)
+                            .padding(.top, 2)
+                    }
+                    .padding(.vertical, 4)
+                }
+                .disabled(!schedule.isEnabled)
+
+                Section("Apps") {
+                    Button {
+                        isPickerPresented = true
+                    } label: {
+                        HStack {
+                            Text("Choose apps")
+                            Spacer()
+                            if let summary = schedule.selectionSummary {
+                                Text(summary)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                .disabled(!schedule.isEnabled)
             }
-            .navigationTitle("Block schedule")
+            .navigationTitle(schedule.name.isEmpty ? "New Schedule" : schedule.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         commitTimes()
-                        onSave()
+                        onSave(schedule)
                         dismiss()
                     }
                 }
@@ -52,6 +89,7 @@ struct ScheduleEditorView: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .familyActivityPicker(isPresented: $isPickerPresented, selection: $schedule.selection)
         }
     }
 
