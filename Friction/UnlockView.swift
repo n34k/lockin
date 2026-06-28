@@ -19,7 +19,7 @@ struct UnlockView: View {
                         .foregroundStyle(.green)
                     Text("Fine. You're in.")
                         .font(.title.bold())
-                    Text("Don't make it weird.")
+                    Text("Placeholder")
                         .foregroundStyle(.secondary)
                 }
                 .transition(.scale.combined(with: .opacity))
