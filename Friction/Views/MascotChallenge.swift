@@ -9,6 +9,7 @@ struct MascotChallenge: UnlockChallenge {
     @State private var userMessage = ""
     @State private var mascotDialogue: String? = nil
     @State private var followUpQuestion: String? = nil
+    @State private var currentEmotion: MascotEmotion = .serious
     @State private var didUnlock = false
     @State private var isLoading = false
     @FocusState private var inputFocused: Bool
@@ -28,6 +29,12 @@ struct MascotChallenge: UnlockChallenge {
             Spacer(minLength: 0)
 
             VStack(spacing: 20) {
+                Image(currentEmotion.imageName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 180, height: 180)
+                    .animation(.spring(duration: 0.35), value: currentEmotion)
+
                 if isLoading && mascotDialogue == nil {
                     ProgressView()
                 } else if let dialogue = mascotDialogue {
@@ -105,8 +112,11 @@ struct MascotChallenge: UnlockChallenge {
             generating: MascotResponse.self
         )
         isLoading = false
-        if let dialogue = result?.content.dialogue {
-            withAnimation { mascotDialogue = dialogue }
+        if let content = result?.content {
+            withAnimation {
+                mascotDialogue = content.dialogue
+                currentEmotion = content.emotion
+            }
             inputFocused = true
         }
     }
@@ -127,7 +137,10 @@ struct MascotChallenge: UnlockChallenge {
 
         guard let content = result?.content else { return }
 
-        withAnimation { mascotDialogue = content.dialogue }
+        withAnimation {
+            mascotDialogue = content.dialogue
+            currentEmotion = content.emotion
+        }
         followUpQuestion = content.shouldUnlock ? nil : content.followUpQuestion
 
         if content.shouldUnlock {

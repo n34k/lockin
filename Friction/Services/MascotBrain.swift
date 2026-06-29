@@ -2,9 +2,43 @@ import Foundation
 import FoundationModels
 
 @Generable
+enum MascotEmotion: String, CaseIterable {
+    case serious        // default, neutral, just watching
+    case happy          // genuinely pleased with the reason
+    case hmm            // thinking it over, not sold yet
+    case notConvinced   // that excuse is weak
+    case ohPlease       // dramatic disbelief, come on
+    case really         // deadpan "really?" energy
+    case sideEye        // suspicious, side-eyeing the excuse
+    case skeptical      // openly skeptical but giving a chance
+    case tryAgain       // flat rejection, try harder
+    case unimpressed    // meh, underwhelming
+    case angry          // fed up — too many unlocks or obvious BS
+
+    var imageName: String {
+        switch self {
+        case .serious:      return "locky-serious"
+        case .happy:        return "locky-happy"
+        case .hmm:          return "locky-hmm"
+        case .notConvinced: return "locky-not-convinced"
+        case .ohPlease:     return "locky-oh-please"
+        case .really:       return "locky-really"
+        case .sideEye:      return "locky-side-eye"
+        case .skeptical:    return "locky-skeptikal"
+        case .tryAgain:     return "locky-try-again"
+        case .unimpressed:  return "locky-unimpressed"
+        case .angry:        return "locky-angry"
+        }
+    }
+}
+
+@Generable
 struct MascotResponse {
     @Guide(description: "Locky's spoken response — short, punchy, in character. No multi-paragraph rambling.")
     var dialogue: String
+
+    @Guide(description: "Locky's emotional state for this response. Pick the one that best matches the vibe of the dialogue.")
+    var emotion: MascotEmotion
 
     @Guide(description: "Whether to grant access to the app right now.")
     var shouldUnlock: Bool
