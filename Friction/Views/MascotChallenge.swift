@@ -16,32 +16,28 @@ struct MascotChallenge: UnlockChallenge {
     @State private var didUnlock = false
     @State private var isLoading = false
     @FocusState private var inputFocused: Bool
-    @State private var session: LanguageModelSession
+    @State private var session: LanguageModelSession?
 
     init(onUnlock: @escaping (Int?) -> Void) {
         self.onUnlock = onUnlock
-        let instructions = buildMascotSystemInstructions(profile: SharedState.loadUserProfile())
-        print("=== [Friction] SYSTEM INSTRUCTIONS ===\n\(instructions)\n=======================================")
-        self._session = State(wrappedValue: LanguageModelSession {
-            Instructions(instructions)
-        })
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 0)
+            // Pinned top: Locky image, fixed size, never moves
+            Image(currentEmotion.imageName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 160, height: 160)
+                .animation(.spring(duration: 0.35), value: currentEmotion)
+                .padding(.vertical, 12)
 
-            VStack(spacing: 20) {
-                Image(currentEmotion.imageName)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 180, height: 180)
-                    .animation(.spring(duration: 0.35), value: currentEmotion)
-
-                if isLoading && mascotDialogue == nil {
-                    ProgressView()
-                } else if mascotDialogue != nil {
-                    VStack(spacing: 10) {
+            // Flexible middle: generated text, scrollable on overflow
+            ScrollView {
+                VStack(spacing: 8) {
+                    if isLoading && mascotDialogue == nil {
+                        ProgressView()
+                    } else if mascotDialogue != nil {
                         Text(displayedDialogue)
                             .font(.title3)
                             .multilineTextAlignment(.center)
@@ -55,35 +51,47 @@ struct MascotChallenge: UnlockChallenge {
                                 .fixedSize(horizontal: false, vertical: true)
                                 .transition(.opacity)
                         }
-                    }
-                }
 
-                if !didUnlock && mascotDialogue != nil {
-                    if isLoading {
-                        ProgressView()
-                    } else {
-                        VStack(spacing: 14) {
-                            TextField("Give me a reason...", text: $userMessage, axis: .vertical)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.body)
-                                .lineLimit(4...8)
-                                .focused($inputFocused)
-
-                            Button("Send it") {
-                                Task { await sendMessage() }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .frame(maxWidth: .infinity)
-                            .disabled(userMessage.isEmpty)
+                        if isLoading {
+                            ProgressView()
+                                .padding(.top, 4)
                         }
                     }
                 }
+                .padding(.horizontal, 24)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 24)
-
-            Spacer(minLength: 0)
         }
-        .task { await resolveNameThenOpen() }
+        // Ignore keyboard so this section never shifts when keyboard opens
+        .ignoresSafeArea(.keyboard)
+        // Input lives outside the ignore scope — safeAreaInset sees keyboard and floats above it
+        .safeAreaInset(edge: .bottom) {
+            if !didUnlock {
+                TextField("Give me a reason...", text: $userMessage)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.body)
+                    .focused($inputFocused)
+                    .submitLabel(.send)
+                    .onSubmit {
+                        guard !userMessage.isEmpty && !isLoading else {
+                            inputFocused = true
+                            return
+                        }
+                        Task { await sendMessage() }
+                        inputFocused = true
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 12)
+                    .padding(.bottom, 16)
+            }
+        }
+        .task {
+            let instructions = buildMascotSystemInstructions(profile: SharedState.loadUserProfile())
+            print("=== [Friction] SYSTEM INSTRUCTIONS ===\n\(instructions)\n=======================================")
+            session = LanguageModelSession { Instructions(instructions) }
+            await resolveNameThenOpen()
+        }
+        .onAppear { inputFocused = true }
     }
 
     private var unlockContext: UnlockContext {
@@ -107,6 +115,7 @@ struct MascotChallenge: UnlockChallenge {
     }
 
     private func fireOpener() async {
+        guard let session else { return }
         isLoading = true
         let openerPrompt = buildOpenerPrompt(context: unlockContext)
         print("=== [Friction] OPENER PROMPT ===\n\(openerPrompt)\n================================")
@@ -144,6 +153,7 @@ struct MascotChallenge: UnlockChallenge {
     }
 
     private func sendMessage() async {
+        guard let session else { return }
         let message = userMessage
         userMessage = ""
         isLoading = true
@@ -156,6 +166,7 @@ struct MascotChallenge: UnlockChallenge {
         )
 
         isLoading = false
+        inputFocused = true
 
         guard let content = result?.content else { return }
 
