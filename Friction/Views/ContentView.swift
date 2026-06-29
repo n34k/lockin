@@ -8,6 +8,7 @@
 import SwiftUI
 import FamilyControls
 import ManagedSettings
+import Combine
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
@@ -112,6 +113,17 @@ struct ContentView: View {
             )
         } else {
             List {
+                if !appState.unlockedEntries.isEmpty {
+                    Section("Escaped") {
+                        ForEach(appState.unlockedEntries) { entry in
+                            EscapedAppRow(entry: entry) {
+                                appState.unlockedEntries.removeAll { $0.id == entry.id }
+                                syncShields()
+                            }
+                        }
+                    }
+                }
+
                 if !blockedApps.isEmpty || !blockedCategories.isEmpty {
                     Section("Currently blocking") {
                         ForEach(Array(blockedApps), id: \.self) { token in
@@ -247,6 +259,51 @@ private struct ScheduleRow: View {
                 .labelsHidden()
             }
         }
+    }
+}
+
+private struct EscapedAppRow: View {
+    let entry: UnlockedEntry
+    let onExpired: () -> Void
+
+    @State private var now = Date()
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.name.isEmpty ? "App" : entry.name)
+                    .font(.body)
+                if entry.expiresAt != nil {
+                    Text("Re-blocking when time's up")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            if let expiresAt = entry.expiresAt {
+                countdown(expiresAt: expiresAt)
+            } else {
+                Text("Freed")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .onReceive(timer) { tick in
+            now = tick
+            if entry.isExpired(at: tick) { onExpired() }
+        }
+    }
+
+    @ViewBuilder
+    private func countdown(expiresAt: Date) -> some View {
+        let remaining = max(0, expiresAt.timeIntervalSince(now))
+        let minutes = Int(remaining) / 60
+        let seconds = Int(remaining) % 60
+        Text(String(format: "%d:%02d", minutes, seconds))
+            .font(.system(.subheadline, design: .monospaced))
+            .foregroundStyle(remaining < 60 ? .red : .orange)
+            .monospacedDigit()
     }
 }
 

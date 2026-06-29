@@ -77,6 +77,12 @@ struct UnlockView: View {
 
     private func handleUnlock(_ duration: Int?) {
         unlockDuration = duration
+        appState.recordUnlock(
+            app: appState.pendingUnlockApp,
+            category: appState.pendingUnlockCategory,
+            name: appState.pendingAppName,
+            duration: duration
+        )
         unlockTargeted()
         withAnimation { showingSuccess = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
