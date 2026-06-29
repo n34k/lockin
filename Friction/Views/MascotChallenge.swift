@@ -8,6 +8,9 @@ struct MascotChallenge: UnlockChallenge {
     @EnvironmentObject private var appState: AppState
     @State private var userMessage = ""
     @State private var mascotDialogue: String? = nil
+    @State private var displayedDialogue: String = ""
+    @State private var typingTask: Task<Void, Never>? = nil
+    @State private var isTyping: Bool = false
     @State private var followUpQuestion: String? = nil
     @State private var currentEmotion: MascotEmotion = .serious
     @State private var didUnlock = false
@@ -37,22 +40,22 @@ struct MascotChallenge: UnlockChallenge {
 
                 if isLoading && mascotDialogue == nil {
                     ProgressView()
-                } else if let dialogue = mascotDialogue {
+                } else if mascotDialogue != nil {
                     VStack(spacing: 10) {
-                        Text(dialogue)
+                        Text(displayedDialogue)
                             .font(.title3)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
 
-                        if let question = followUpQuestion {
+                        if let question = followUpQuestion, !isTyping {
                             Text(question)
                                 .font(.subheadline)
                                 .multilineTextAlignment(.center)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
+                                .transition(.opacity)
                         }
                     }
-                    .transition(.opacity)
                 }
 
                 if !didUnlock && mascotDialogue != nil {
@@ -113,11 +116,30 @@ struct MascotChallenge: UnlockChallenge {
         )
         isLoading = false
         if let content = result?.content {
-            withAnimation {
-                mascotDialogue = content.dialogue
-                currentEmotion = content.emotion
-            }
+            withAnimation { currentEmotion = content.emotion }
+            mascotDialogue = content.dialogue
+            typewrite(content.dialogue)
             inputFocused = true
+        }
+    }
+
+    @MainActor
+    private func typewrite(_ text: String) {
+        typingTask?.cancel()
+        displayedDialogue = ""
+        isTyping = true
+        let haptic = UIImpactFeedbackGenerator(style: .light)
+        haptic.prepare()
+        typingTask = Task {
+            for (i, char) in text.enumerated() {
+                guard !Task.isCancelled else { break }
+                displayedDialogue.append(char)
+                if i % 3 == 0 {
+                    haptic.impactOccurred(intensity: 0.35)
+                }
+                try? await Task.sleep(for: .milliseconds(28))
+            }
+            isTyping = false
         }
     }
 
@@ -137,11 +159,10 @@ struct MascotChallenge: UnlockChallenge {
 
         guard let content = result?.content else { return }
 
-        withAnimation {
-            mascotDialogue = content.dialogue
-            currentEmotion = content.emotion
-        }
+        withAnimation { currentEmotion = content.emotion }
+        mascotDialogue = content.dialogue
         followUpQuestion = content.shouldUnlock ? nil : content.followUpQuestion
+        typewrite(content.dialogue)
 
         if content.shouldUnlock {
             didUnlock = true
