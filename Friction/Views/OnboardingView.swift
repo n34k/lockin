@@ -256,11 +256,11 @@ struct OnboardingView: View {
             }
         }
         .padding(32)
-        .onAppear {
+        .task {
             showImpactCTA = false
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                withAnimation { showImpactCTA = true }
-            }
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            withAnimation { showImpactCTA = true }
         }
     }
 

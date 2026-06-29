@@ -13,18 +13,20 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             let type = SharedState.loadPendingUnlockType()
             let data = SharedState.loadPendingUnlockData()
             let scheduleContext = SharedState.loadPendingScheduleContext()
-            DispatchQueue.main.async {
+            let appName = SharedState.loadPendingAppName() ?? ""
+            Task { @MainActor in
+                let state = AppState.shared
                 if let data {
                     if type == "app", let token = try? JSONDecoder().decode(ApplicationToken.self, from: data) {
-                        AppState.shared.pendingUnlockApp = token
+                        state.pendingUnlockApp = token
                     } else if type == "category", let token = try? JSONDecoder().decode(ActivityCategoryToken.self, from: data) {
-                        AppState.shared.pendingUnlockCategory = token
+                        state.pendingUnlockCategory = token
                     }
                 }
-                AppState.shared.pendingAppName = SharedState.loadPendingAppName() ?? ""
-                AppState.shared.pendingScheduleName = scheduleContext.name
-                AppState.shared.pendingScheduleReason = scheduleContext.reason
-                AppState.shared.showingUnlock = true
+                state.pendingAppName = appName
+                state.pendingScheduleName = scheduleContext.name
+                state.pendingScheduleReason = scheduleContext.reason
+                state.showingUnlock = true
             }
         }
         completionHandler()

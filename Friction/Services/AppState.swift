@@ -16,7 +16,8 @@ struct UnlockedEntry: Identifiable {
     }
 }
 
-class AppState: ObservableObject {
+@MainActor
+final class AppState: ObservableObject {
     static let shared = AppState()
     @Published var showingUnlock = false
     @Published var pendingUnlockApp: ApplicationToken? = nil

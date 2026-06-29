@@ -14,6 +14,7 @@ struct UnlockView: View {
     @EnvironmentObject var appState: AppState
     @State private var showingSuccess = false
     @State private var unlockDuration: Int? = nil
+    @State private var dismissTask: Task<Void, Never>? = nil
 
     var body: some View {
         NavigationStack {
@@ -77,6 +78,7 @@ struct UnlockView: View {
 
     private func handleUnlock(_ duration: Int?) {
         unlockDuration = duration
+        SharedState.recordUnlockToday()
         appState.recordUnlock(
             app: appState.pendingUnlockApp,
             category: appState.pendingUnlockCategory,
@@ -85,7 +87,10 @@ struct UnlockView: View {
         )
         unlockTargeted()
         withAnimation { showingSuccess = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        dismissTask?.cancel()
+        dismissTask = Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
             appState.showingUnlock = false
         }
     }

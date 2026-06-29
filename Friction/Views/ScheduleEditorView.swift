@@ -28,9 +28,16 @@ struct ScheduleEditorView: View {
                     Toggle("Enabled", isOn: $schedule.isEnabled)
                 }
 
-                Section("Blocking hours") {
+                Section {
                     DatePicker("Start", selection: $startDate, displayedComponents: .hourAndMinute)
                     DatePicker("End",   selection: $endDate,   displayedComponents: .hourAndMinute)
+                } header: {
+                    Text("Blocking hours")
+                } footer: {
+                    if !endIsAfterStart {
+                        Text("End time must be after the start time. Overnight schedules aren't supported yet.")
+                            .foregroundStyle(.red)
+                    }
                 }
                 .disabled(!schedule.isEnabled)
 
@@ -98,7 +105,17 @@ struct ScheduleEditorView: View {
         !schedule.name.trimmingCharacters(in: .whitespaces).isEmpty &&
         !schedule.activeDays.isEmpty &&
         (schedule.selection.applicationTokens.count + schedule.selection.categoryTokens.count) > 0 &&
-        !schedule.reason.trimmingCharacters(in: .whitespaces).isEmpty
+        !schedule.reason.trimmingCharacters(in: .whitespaces).isEmpty &&
+        endIsAfterStart
+    }
+
+    // Overnight (end-before-start) ranges aren't supported by isCurrentlyActive() or
+    // DeviceActivitySchedule, so block them at the editor instead of silently misbehaving.
+    private var endIsAfterStart: Bool {
+        let cal = Calendar.current
+        let startM = cal.component(.hour, from: startDate) * 60 + cal.component(.minute, from: startDate)
+        let endM   = cal.component(.hour, from: endDate)   * 60 + cal.component(.minute, from: endDate)
+        return endM > startM
     }
 
     private func commitTimes() {

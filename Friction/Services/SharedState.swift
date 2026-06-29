@@ -168,6 +168,31 @@ enum SharedState {
     static func resetOnboarding() {
         defaults.removeObject(forKey: onboardingDoneKey)
         defaults.removeObject(forKey: userProfileKey)
+        defaults.removeObject(forKey: unlockCountKey)
+        defaults.removeObject(forKey: unlockCountDateKey)
+    }
+
+    // MARK: - Daily unlock counter
+    // Drives the mascot's escalation: the more unlocks today, the more fed up Locky gets.
+    // Stored in the App Group so the value is consistent across the main app and extensions.
+    private static let unlockCountKey = "unlockCount"
+    private static let unlockCountDateKey = "unlockCountDate"
+
+    static func unlocksToday(now: Date = Date()) -> Int {
+        let today = Calendar.current.startOfDay(for: now)
+        guard let stored = defaults.object(forKey: unlockCountDateKey) as? Date,
+              Calendar.current.isDate(stored, inSameDayAs: today)
+        else { return 0 }
+        return defaults.integer(forKey: unlockCountKey)
+    }
+
+    @discardableResult
+    static func recordUnlockToday(now: Date = Date()) -> Int {
+        let today = Calendar.current.startOfDay(for: now)
+        let next = unlocksToday(now: now) + 1
+        defaults.set(next, forKey: unlockCountKey)
+        defaults.set(today, forKey: unlockCountDateKey)
+        return next
     }
 
     static func clearPendingUnlock() {

@@ -10,6 +10,7 @@ struct MascotChallenge: UnlockChallenge {
     @State private var mascotDialogue: String? = nil
     @State private var displayedDialogue: String = ""
     @State private var typingTask: Task<Void, Never>? = nil
+    @State private var unlockTask: Task<Void, Never>? = nil
     @State private var isTyping: Bool = false
     @State private var followUpQuestion: String? = nil
     @State private var currentEmotion: MascotEmotion = .serious
@@ -87,11 +88,17 @@ struct MascotChallenge: UnlockChallenge {
         }
         .task {
             let instructions = buildMascotSystemInstructions(profile: SharedState.loadUserProfile())
+            #if DEBUG
             print("=== [Friction] SYSTEM INSTRUCTIONS ===\n\(instructions)\n=======================================")
+            #endif
             session = LanguageModelSession { Instructions(instructions) }
             await resolveNameThenOpen()
         }
         .onAppear { inputFocused = true }
+        .onDisappear {
+            typingTask?.cancel()
+            unlockTask?.cancel()
+        }
     }
 
     private var unlockContext: UnlockContext {
@@ -99,7 +106,7 @@ struct MascotChallenge: UnlockChallenge {
             appName: appState.pendingAppName,
             scheduleName: appState.pendingScheduleName,
             blockReason: appState.pendingScheduleReason,
-            unlocksToday: 0
+            unlocksToday: SharedState.unlocksToday()
         )
     }
 
@@ -118,7 +125,9 @@ struct MascotChallenge: UnlockChallenge {
         guard let session else { return }
         isLoading = true
         let openerPrompt = buildOpenerPrompt(context: unlockContext)
+        #if DEBUG
         print("=== [Friction] OPENER PROMPT ===\n\(openerPrompt)\n================================")
+        #endif
         let result = try? await session.respond(
             to: openerPrompt,
             generating: MascotResponse.self
@@ -159,7 +168,9 @@ struct MascotChallenge: UnlockChallenge {
         isLoading = true
 
         let unlockPrompt = buildUnlockPrompt(userMessage: message, context: unlockContext)
+        #if DEBUG
         print("=== [Friction] UNLOCK PROMPT ===\n\(unlockPrompt)\n================================")
+        #endif
         let result = try? await session.respond(
             to: unlockPrompt,
             generating: MascotResponse.self
@@ -177,8 +188,14 @@ struct MascotChallenge: UnlockChallenge {
 
         if content.shouldUnlock {
             didUnlock = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                onUnlock(content.unlockDurationMinutes)
+            // The model may grant an unlock without specifying a duration; never leave it
+            // open-ended (that would be a permanent escape that never re-blocks).
+            let minutes = content.unlockDurationMinutes.map { min(max($0, 1), 30) } ?? 5
+            unlockTask?.cancel()
+            unlockTask = Task {
+                try? await Task.sleep(for: .seconds(1.2))
+                guard !Task.isCancelled else { return }
+                onUnlock(minutes)
             }
         }
     }

@@ -173,6 +173,9 @@ struct ContentView: View {
     }
 
     private func syncShields() {
+        // Drop unlocks whose time is up so they re-block on this pass.
+        appState.unlockedEntries.removeAll { $0.isExpired() }
+
         let store = ManagedSettingsStore()
         let active = schedules.filter { $0.isCurrentlyActive() }
         if active.isEmpty {
@@ -188,6 +191,15 @@ struct ContentView: View {
             apps.formUnion(s.selection.applicationTokens)
             categories.formUnion(s.selection.categoryTokens)
         }
+
+        // Honor still-valid temporary unlocks: don't re-shield an app/category the
+        // user just earned their way into until its countdown expires.
+        let freed = appState.unlockedEntries.filter { !$0.isExpired() }
+        let freedApps = Set(freed.compactMap { $0.appToken })
+        let freedCategories = Set(freed.compactMap { $0.categoryToken })
+        apps.subtract(freedApps)
+        categories.subtract(freedCategories)
+
         store.shield.applications = apps.isEmpty ? nil : apps
         store.shield.applicationCategories = categories.isEmpty ? nil : .specific(categories, except: [])
         blockedApps = apps
@@ -290,6 +302,8 @@ private struct EscapedAppRow: View {
             }
         }
         .onReceive(timer) { tick in
+            // Only timed entries need a per-second redraw; "Freed" rows stay static.
+            guard entry.expiresAt != nil else { return }
             now = tick
             if entry.isExpired(at: tick) { onExpired() }
         }
