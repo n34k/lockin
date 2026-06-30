@@ -23,6 +23,8 @@ xcodebuild test -project Friction.xcodeproj -scheme Friction -destination 'platf
 
 **Critical:** The Screen Time / FamilyControls entitlement requires a **real device** — the simulator cannot test the blocking loop end-to-end. Entitlement failures surface silently (no crash, just "nothing happens"). Always test the cross-process wiring on hardware.
 
+**Never launch the iOS Simulator.** Do not run anything that boots the simulator or Simulator.app (e.g. `-destination 'platform=iOS Simulator,...'`, `xcrun simctl`) to verify changes. The simulator can't exercise this app's core anyway, and the user verifies on a real device. After editing, stop at "compiles / written to disk." If a build check is genuinely needed, ask first and use a compile-only or real-device destination only.
+
 ## Apple Documentation
 
 Use the `apple-docs` MCP server to look up Apple framework APIs rather than relying on training data. The Screen Time APIs (`FamilyControls`, `DeviceActivity`, `ManagedSettings`, `ManagedSettingsUI`) and Foundation Models are the most relevant frameworks for this project and change frequently.

@@ -31,7 +31,11 @@ struct ContentView: View {
             }
         } else {
             mainView
-                .sheet(isPresented: $appState.showingUnlock) {
+                .sheet(isPresented: $appState.showingUnlock, onDismiss: {
+                    // A just-unlocked app needs to move out of "Currently blocking";
+                    // re-derive shield state so the freed token is subtracted.
+                    syncShields()
+                }) {
                     UnlockView()
                         .environmentObject(appState)
                 }
@@ -284,7 +288,7 @@ private struct EscapedAppRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(entry.name.isEmpty ? "App" : entry.name)
+                appLabel
                     .font(.body)
                 if entry.expiresAt != nil {
                     Text("Re-blocking when time's up")
@@ -306,6 +310,20 @@ private struct EscapedAppRow: View {
             guard entry.expiresAt != nil else { return }
             now = tick
             if entry.isExpired(at: tick) { onExpired() }
+        }
+    }
+
+    // Label(token) resolves the real app/category name + icon through the system —
+    // the same native path "Currently blocking" uses. Fall back to the stored name
+    // only when the token is missing.
+    @ViewBuilder
+    private var appLabel: some View {
+        if let app = entry.appToken {
+            Label(app)
+        } else if let category = entry.categoryToken {
+            Label(category)
+        } else {
+            Text(entry.name.isEmpty ? "App" : entry.name)
         }
     }
 
