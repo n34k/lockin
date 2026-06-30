@@ -1,6 +1,60 @@
 import SwiftUI
 import FoundationModels
 import FamilyControls
+import CoreHaptics
+
+/// Drives the typewriter "clack" haptics with a single Core Haptics pattern per
+/// line instead of repeated `UIImpactFeedbackGenerator.impactOccurred` calls.
+/// Each `impactOccurred` sends its own message to the system haptic server, and
+/// firing them throughout the animation trips the 32hz reporter limit, spamming
+/// "Message send exceeds rate-limit threshold and will be dropped" in the log.
+/// Pre-building all the taps into one pattern means a single message — no spam.
+final class TypewriterHaptics {
+    private let supportsHaptics = CHHapticEngine.capabilitiesForHardware().supportsHaptics
+    private var engine: CHHapticEngine?
+    private var player: CHHapticPatternPlayer?
+
+    init() {
+        guard supportsHaptics else { return }
+        engine = try? CHHapticEngine()
+        engine?.isAutoShutdownEnabled = true
+        engine?.resetHandler = { [weak self] in try? self?.engine?.start() }
+    }
+
+    /// Plays one transient tap every `everyN` characters, spaced `interval`
+    /// apart, matching the visual typewriter cadence.
+    func play(charCount: Int, everyN: Int, interval: TimeInterval, intensity: Float) {
+        guard supportsHaptics, let engine else { return }
+        stop()
+        var events: [CHHapticEvent] = []
+        var i = 0
+        while i < charCount {
+            events.append(CHHapticEvent(
+                eventType: .hapticTransient,
+                parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: intensity),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5),
+                ],
+                relativeTime: Double(i) * interval
+            ))
+            i += everyN
+        }
+        guard !events.isEmpty else { return }
+        do {
+            try engine.start()
+            let pattern = try CHHapticPattern(events: events, parameters: [])
+            player = try engine.makePlayer(with: pattern)
+            try player?.start(atTime: CHHapticTimeImmediate)
+        } catch {
+            // Haptics are non-essential; never let a failure break the animation.
+        }
+    }
+
+    func stop() {
+        try? player?.stop(atTime: CHHapticTimeImmediate)
+        player = nil
+    }
+}
 
 struct MascotChallenge: UnlockChallenge {
     let onUnlock: (Int?) -> Void
@@ -12,6 +66,7 @@ struct MascotChallenge: UnlockChallenge {
     @State private var typingTask: Task<Void, Never>? = nil
     @State private var unlockTask: Task<Void, Never>? = nil
     @State private var isTyping: Bool = false
+    @State private var haptics = TypewriterHaptics()
     @State private var followUpQuestion: String? = nil
     @State private var currentEmotion: MascotEmotion = .serious
     @State private var didUnlock = false
@@ -98,6 +153,7 @@ struct MascotChallenge: UnlockChallenge {
         .onDisappear {
             typingTask?.cancel()
             unlockTask?.cancel()
+            haptics.stop()
         }
     }
 
@@ -146,16 +202,13 @@ struct MascotChallenge: UnlockChallenge {
         typingTask?.cancel()
         displayedDialogue = ""
         isTyping = true
-        let haptic = UIImpactFeedbackGenerator(style: .light)
-        haptic.prepare()
+        let interval = 0.028
+        haptics.play(charCount: text.count, everyN: 3, interval: interval, intensity: 0.35)
         typingTask = Task {
-            for (i, char) in text.enumerated() {
+            for char in text {
                 guard !Task.isCancelled else { break }
                 displayedDialogue.append(char)
-                if i % 3 == 0 {
-                    haptic.impactOccurred(intensity: 0.35)
-                }
-                try? await Task.sleep(for: .milliseconds(28))
+                try? await Task.sleep(for: .seconds(interval))
             }
             isTyping = false
         }
