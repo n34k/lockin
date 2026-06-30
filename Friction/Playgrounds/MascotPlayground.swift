@@ -4,7 +4,6 @@ import Playgrounds
 
 #Playground {
     let context = UnlockContext(
-        appName: "Instagram",
         scheduleName: "Work Focus",
         blockReason: "Stay focused during work hours",
         unlocksToday: 0

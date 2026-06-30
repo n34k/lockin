@@ -4,7 +4,7 @@ import DeviceActivity
 
 let appGroupID = "group.ndenterprises.Friction"
 
-struct UserProfile: Codable {
+struct UserProfile: Codable, Equatable {
     var name: String
     var age: Int
     var dailyWasteHours: Double

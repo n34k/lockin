@@ -142,12 +142,25 @@ struct MascotChallenge: UnlockChallenge {
             }
         }
         .task {
+            // Fast path: the main screen pre-warmed a session and pre-generated the
+            // opener. Hand it off so the opener shows instantly and the model is hot.
+            if let pair = MascotPreloader.shared.take() {
+                session = pair.session
+                isLoading = false
+                withAnimation { currentEmotion = pair.opener.emotion }
+                mascotDialogue = pair.opener.dialogue
+                typewrite(pair.opener.dialogue)
+                inputFocused = true
+                return
+            }
+            // Fallback (e.g. reached via notification, or preload not finished): build
+            // the session live and generate the opener now.
             let instructions = buildMascotSystemInstructions(profile: SharedState.loadUserProfile())
             #if DEBUG
             print("=== [Friction] SYSTEM INSTRUCTIONS ===\n\(instructions)\n=======================================")
             #endif
             session = LanguageModelSession { Instructions(instructions) }
-            await resolveNameThenOpen()
+            await fireOpener()
         }
         .onAppear { inputFocused = true }
         .onDisappear {
@@ -159,22 +172,10 @@ struct MascotChallenge: UnlockChallenge {
 
     private var unlockContext: UnlockContext {
         UnlockContext(
-            appName: appState.pendingAppName,
             scheduleName: appState.pendingScheduleName,
             blockReason: appState.pendingScheduleReason,
             unlocksToday: SharedState.unlocksToday()
         )
-    }
-
-    private func resolveNameThenOpen() async {
-        if appState.pendingAppName.isEmpty {
-            if let token = appState.pendingUnlockApp {
-                appState.pendingAppName = await AppNameResolver.resolveName(for: token) ?? ""
-            } else if let token = appState.pendingUnlockCategory {
-                appState.pendingAppName = await AppNameResolver.resolveName(for: token) ?? ""
-            }
-        }
-        await fireOpener()
     }
 
     private func fireOpener() async {

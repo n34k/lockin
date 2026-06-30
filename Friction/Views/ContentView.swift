@@ -187,6 +187,7 @@ struct ContentView: View {
             store.shield.applicationCategories = nil
             blockedApps = []
             blockedCategories = []
+            MascotPreloader.shared.invalidate()
             return
         }
         var apps: Set<ApplicationToken> = []
@@ -208,6 +209,20 @@ struct ContentView: View {
         store.shield.applicationCategories = categories.isEmpty ? nil : .specific(categories, except: [])
         blockedApps = apps
         blockedCategories = categories
+
+        // Warm the mascot session + opener while the user is on the main screen,
+        // but only when something is actually shielded right now (active schedules
+        // whose apps are all temporarily unlocked leave nothing to unlock).
+        if !apps.isEmpty || !categories.isEmpty {
+            let ctx = UnlockContext(
+                scheduleName: active.first?.name ?? "",
+                blockReason: active.first?.reason ?? "",
+                unlocksToday: SharedState.unlocksToday()
+            )
+            MascotPreloader.shared.preload(profile: SharedState.loadUserProfile(), context: ctx)
+        } else {
+            MascotPreloader.shared.invalidate()
+        }
     }
 
     private func initiateUnlock(app: ApplicationToken) {

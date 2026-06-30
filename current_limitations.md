@@ -24,7 +24,7 @@ wall. Apps are identified by **opaque tokens** (`ApplicationToken`,
 `ActivityCategoryToken`) — not bundle IDs, not names. Apple's explicit design goal
 is that a blocking app like ours should **never be able to learn which apps the
 user has selected or blocked**. The name simply is not available to our code as a
-readable string. The system will *display* it for us, but never *hand it to us*.
+readable string. The system will _display_ it for us, but never _hand it to us_.
 
 We tried every available avenue. All of them fail:
 
@@ -43,24 +43,24 @@ under our authorization mode.
 - Apple's documentation lists these properties with **no caveat**, which is what
   sends everyone down this path. The redaction is undocumented behavior.
 
-> Our `ShieldConfigurationExtension` still *attempts* this and writes the result to
+> Our `ShieldConfigurationExtension` still _attempts_ this and writes the result to
 > the App Group. It's harmless and would opportunistically work if Apple ever
 > populated it — but in practice it writes nothing.
 
 #### Avenue B — Render `Label(token)` and OCR it
 
-SwiftUI's `Label(ApplicationToken)` *will* display the real app name on screen.
+SwiftUI's `Label(ApplicationToken)` _will_ display the real app name on screen.
 The idea: render that label to an image, then run Vision OCR to recover the string.
 
 This fails because of **how** the system renders it. `Label(token)` does not draw
 the name from our process — the system composites the name and icon **out of
 process** (a privacy "portal" / remote view). Consequences:
 
-- **`ImageRenderer` (offscreen snapshot):** only captures *our* process's view
+- **`ImageRenderer` (offscreen snapshot):** only captures _our_ process's view
   tree. The portal content isn't in our address space, so the snapshot comes back
   **blank**. OCR sees nothing → `nil`. (This was our original `AppNameResolver`.)
 - **`drawHierarchy(in:afterScreenUpdates: true)` on a window-attached `Label`:**
-  this forces an on-screen update pass and *can* pull portal content into a bitmap
+  this forces an on-screen update pass and _can_ pull portal content into a bitmap
   in some cases, but for FamilyControls tokens it is unreliable — the portal
   frequently doesn't composite into a programmatic capture, and timing is
   nondeterministic. Not dependable enough to ship. (We prototyped this and backed
@@ -68,21 +68,21 @@ process** (a privacy "portal" / remote view). Consequences:
 
 The cruel detail that makes this feel solvable: the **on-screen** `Label(token)` in
 our unlock UI (e.g. the toolbar in `UnlockView`) renders the name perfectly,
-because that goes through the live window where the system *does* composite the
-portal. So we can *see* the name on screen while our code can never *read* it. That
+because that goes through the live window where the system _does_ composite the
+portal. So we can _see_ the name on screen while our code can never _read_ it. That
 visual success is what makes the OCR path look promising — but it's the live window
 doing the work, not anything we can capture.
 
 ### What actually works (and what doesn't)
 
-| Capability | Works? |
-|---|---|
-| **Display** the app name/icon on screen via `Label(token)` | ✅ Yes |
-| Read the app name as a `String` in our process | ❌ No |
-| Get the bundle identifier | ❌ No (redacted under `.individual`) |
+| Capability                                                    | Works?                                  |
+| ------------------------------------------------------------- | --------------------------------------- |
+| **Display** the app name/icon on screen via `Label(token)`    | ✅ Yes                                  |
+| Read the app name as a `String` in our process                | ❌ No                                   |
+| Get the bundle identifier                                     | ❌ No (redacted under `.individual`)    |
 | Persist/compare the same app across launches (token equality) | ✅ Yes (tokens are stable & `Hashable`) |
 
-So we can show the user *which* app is blocked (visually), and we can tell *whether*
+So we can show the user _which_ app is blocked (visually), and we can tell _whether_
 two tokens are the same app — we just can't know the human-readable name in code.
 
 ### Current behavior in the app
@@ -92,7 +92,7 @@ The unlock prompt builders (`buildOpenerPrompt`, `buildUnlockPrompt` in
 Because `appName` resolves to `""` in practice, **that line is simply omitted** and
 Locky talks about "the app" generically. Everything else in the context (schedule
 name, the user's stated block reason, unlock count, user profile) is fully
-available and *does* reach the prompt — those don't depend on the token.
+available and _does_ reach the prompt — those don't depend on the token.
 
 ### If we ever revisit
 
@@ -101,11 +101,11 @@ Only worth reopening if one of these changes:
 1. **Apple lifts the redaction** for `.individual` authorization in a future iOS
    (unlikely — it's a core privacy stance, not an oversight).
 2. **We capture the name at selection time, indirectly.** When the user picks apps
-   in `FamilyActivityPicker`, we still only get tokens — but we *could* ask the user
+   in `FamilyActivityPicker`, we still only get tokens — but we _could_ ask the /user
    to name/label their own block in onboarding, and key Locky's references off that
    user-supplied label instead of the real app name. This sidesteps the limitation
    entirely by never needing the real name.
 3. **Pivot the copy** so the missing name is invisible — lean on the schedule name
-   and the user's own stated reason, which we *do* have.
+   and the user's own stated reason, which we _do_ have.
 
 Option 2 is the realistic path if app-specific personality ever becomes important.

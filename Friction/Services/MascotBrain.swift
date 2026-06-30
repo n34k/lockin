@@ -51,13 +51,11 @@ struct MascotResponse {
 }
 
 struct UnlockContext {
-    let appName: String
     let scheduleName: String
     let blockReason: String
     let unlocksToday: Int
 
     static let placeholder = UnlockContext(
-        appName: "Instagram",
         scheduleName: "Work Focus",
         blockReason: "Stay focused while making my app",
         unlocksToday: 0
@@ -66,9 +64,6 @@ struct UnlockContext {
 
 func buildOpenerPrompt(context: UnlockContext) -> String {
     var lines: [String] = []
-    if !context.appName.isEmpty {
-        lines.append("App the user wants to unlock: \(context.appName)")
-    }
     if !context.scheduleName.isEmpty {
         lines.append("Schedule that blocked it: \(context.scheduleName)")
     }
@@ -77,15 +72,12 @@ func buildOpenerPrompt(context: UnlockContext) -> String {
     }
     lines.append("Times they've unlocked apps today: \(context.unlocksToday)")
     lines.append("")
-    lines.append("The app is still blocked. The user just showed up at the lock screen wanting in — they have NOT been let through and have NOT given a reason yet. This is your opening line: greet them / call out the fact that they're trying to get back into \(context.appName.isEmpty ? "the app" : context.appName) in one punchy line. Do not grant access and do not ask for their reason yet — just react to them showing up.")
+    lines.append("The app is still blocked. The user just showed up at the lock screen wanting in — they have NOT been let through and have NOT given a reason yet. This is your opening line: greet them / call out the fact that they're trying to get back into a blocked app in one punchy line. Do not grant access and do not ask for their reason yet — just react to them showing up.")
     return lines.joined(separator: "\n")
 }
 
 func buildUnlockPrompt(userMessage: String, context: UnlockContext) -> String {
     var lines: [String] = []
-    if !context.appName.isEmpty {
-        lines.append("App the user wants to unlock: \(context.appName)")
-    }
     if !context.scheduleName.isEmpty {
         lines.append("Schedule that blocked it: \(context.scheduleName)")
     }
