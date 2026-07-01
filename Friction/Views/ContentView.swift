@@ -19,6 +19,8 @@ struct ContentView: View {
     @State private var editingSchedule: BlockSchedule? = nil
     @State private var blockedApps: Set<ApplicationToken> = []
     @State private var blockedCategories: Set<ActivityCategoryToken> = []
+    @State private var quickBlock: QuickBlock? = SharedState.activeQuickBlock()
+    @State private var showingQuickBlock = false
 
     var body: some View {
         if !onboardingComplete {
@@ -89,6 +91,11 @@ struct ContentView: View {
                 saveOrAppend(updated)
             }
         }
+        .sheet(isPresented: $showingQuickBlock) {
+            QuickBlockView { block in
+                startQuickBlock(block)
+            }
+        }
     }
 
     @ViewBuilder
@@ -109,41 +116,65 @@ struct ContentView: View {
 
     @ViewBuilder
     private var scheduleList: some View {
-        if schedules.isEmpty {
-            ContentUnavailableView(
-                "No schedules",
-                systemImage: "clock",
-                description: Text("Tap + to add a blocking schedule.")
-            )
-        } else {
-            List {
-                if !appState.unlockedEntries.isEmpty {
-                    Section("Escaped") {
-                        ForEach(appState.unlockedEntries) { entry in
-                            EscapedAppRow(entry: entry) {
-                                appState.unlockedEntries.removeAll { $0.id == entry.id }
-                                syncShields()
+        List {
+            Section {
+                if let block = quickBlock {
+                    QuickBlockTimerCard(
+                        block: block,
+                        onExpired: { endQuickBlockIfExpired() },
+                        onEndEarly: { startQuickBlockCancel() }
+                    )
+                } else {
+                    Button { showingQuickBlock = true } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "bolt.fill")
+                                .foregroundStyle(.orange)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Block now")
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+                                Text("Lock apps for a set time — no schedule, starts immediately")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
+                            Spacer()
                         }
                     }
                 }
+            }
 
-                if !blockedApps.isEmpty || !blockedCategories.isEmpty {
-                    Section("Currently blocking") {
-                        ForEach(Array(blockedApps), id: \.self) { token in
-                            Button { initiateUnlock(app: token) } label: {
-                                BlockedAppRow(token: token)
-                            }
-                        }
-                        ForEach(Array(blockedCategories), id: \.self) { token in
-                            Button { initiateUnlock(category: token) } label: {
-                                BlockedCategoryRow(token: token)
-                            }
+            if !appState.unlockedEntries.isEmpty {
+                Section("Escaped") {
+                    ForEach(appState.unlockedEntries) { entry in
+                        EscapedAppRow(entry: entry) {
+                            appState.unlockedEntries.removeAll { $0.id == entry.id }
+                            syncShields()
                         }
                     }
                 }
+            }
 
-                Section("Schedules") {
+            if !blockedApps.isEmpty || !blockedCategories.isEmpty {
+                Section("Currently blocking") {
+                    ForEach(Array(blockedApps), id: \.self) { token in
+                        Button { initiateUnlock(app: token) } label: {
+                            BlockedAppRow(token: token)
+                        }
+                    }
+                    ForEach(Array(blockedCategories), id: \.self) { token in
+                        Button { initiateUnlock(category: token) } label: {
+                            BlockedCategoryRow(token: token)
+                        }
+                    }
+                }
+            }
+
+            Section("Schedules") {
+                if schedules.isEmpty {
+                    Text("No schedules yet. Tap + to add one, or use Block Now above.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
                     ForEach(Array(schedules.enumerated()), id: \.element.id) { idx, schedule in
                         ScheduleRow(schedule: schedule, isActive: schedule.isCurrentlyActive()) {
                             editingSchedule = schedule
@@ -180,21 +211,36 @@ struct ContentView: View {
         // Drop unlocks whose time is up so they re-block on this pass.
         appState.unlockedEntries.removeAll { $0.isExpired() }
 
+        // Refresh quick-block state; if it just expired, tear down its backstop + Live Activity.
+        let hadQuickBlock = quickBlock != nil
+        quickBlock = SharedState.activeQuickBlock()
+        if hadQuickBlock && quickBlock == nil {
+            ScheduleEngine.shared.stopQuickBlock()
+            LiveActivityController.end()
+        }
+
         let store = ManagedSettingsStore()
         let active = schedules.filter { $0.isCurrentlyActive() }
-        if active.isEmpty {
+
+        var apps: Set<ApplicationToken> = []
+        var categories: Set<ActivityCategoryToken> = []
+        for s in active {
+            apps.formUnion(s.selection.applicationTokens)
+            categories.formUnion(s.selection.categoryTokens)
+        }
+        // A running quick block stacks its apps on top of any active schedules.
+        if let quickBlock {
+            apps.formUnion(quickBlock.selection.applicationTokens)
+            categories.formUnion(quickBlock.selection.categoryTokens)
+        }
+
+        if apps.isEmpty && categories.isEmpty {
             store.shield.applications = nil
             store.shield.applicationCategories = nil
             blockedApps = []
             blockedCategories = []
             MascotPreloader.shared.invalidate()
             return
-        }
-        var apps: Set<ApplicationToken> = []
-        var categories: Set<ActivityCategoryToken> = []
-        for s in active {
-            apps.formUnion(s.selection.applicationTokens)
-            categories.formUnion(s.selection.categoryTokens)
         }
 
         // Honor still-valid temporary unlocks: don't re-shield an app/category the
@@ -211,13 +257,16 @@ struct ContentView: View {
         blockedCategories = categories
 
         // Warm the mascot session + opener while the user is on the main screen,
-        // but only when something is actually shielded right now (active schedules
-        // whose apps are all temporarily unlocked leave nothing to unlock).
+        // but only when something is actually shielded right now. A quick block takes
+        // precedence over schedules for which persona Locky uses (strict vs. normal).
         if !apps.isEmpty || !categories.isEmpty {
+            let qbActive = quickBlock != nil
             let ctx = UnlockContext(
-                scheduleName: active.first?.name ?? "",
-                blockReason: active.first?.reason ?? "",
-                unlocksToday: SharedState.unlocksToday()
+                scheduleName: qbActive ? "Hard block" : (active.first?.name ?? ""),
+                blockReason: qbActive ? (quickBlock?.reason ?? "") : (active.first?.reason ?? ""),
+                unlocksToday: SharedState.unlocksToday(),
+                isQuickBlock: qbActive,
+                remainingMinutes: quickBlock.map { Int(ceil($0.remaining() / 60)) }
             )
             MascotPreloader.shared.preload(profile: SharedState.loadUserProfile(), context: ctx)
         } else {
@@ -225,25 +274,64 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Quick block lifecycle
+
+    private func startQuickBlock(_ block: QuickBlock) {
+        SharedState.saveQuickBlock(block)
+        quickBlock = block
+        ScheduleEngine.shared.applyQuickBlock(block)
+        LiveActivityController.start(block)
+        syncShields()  // applies the shield immediately + warms the strict mascot
+    }
+
+    /// Called by the timer card when the countdown reaches zero while the app is open.
+    private func endQuickBlockIfExpired() {
+        SharedState.clearQuickBlock()
+        ScheduleEngine.shared.stopQuickBlock()
+        LiveActivityController.end()
+        quickBlock = nil
+        syncShields()
+    }
+
+    /// "End early" → route through the strict mascot gate. Actual teardown happens in
+    /// UnlockView.handleUnlock once Locky relents; onDismiss → syncShields reconciles.
+    private func startQuickBlockCancel() {
+        let qb = SharedState.activeQuickBlock()
+        appState.pendingUnlockApp = nil
+        appState.pendingUnlockCategory = nil
+        appState.pendingAppName = ""
+        appState.pendingIsQuickBlock = true
+        appState.pendingQuickBlockCancel = true
+        appState.pendingScheduleName = "Hard block"
+        appState.pendingScheduleReason = qb?.reason ?? ""
+        appState.showingUnlock = true
+    }
+
     private func initiateUnlock(app: ApplicationToken) {
+        let qb = SharedState.activeQuickBlock()
         let active = schedules.filter { $0.isCurrentlyActive() }
         let match = active.first { $0.selection.applicationTokens.contains(app) } ?? active.first
         appState.pendingUnlockApp = app
         appState.pendingUnlockCategory = nil
         appState.pendingAppName = SharedState.loadPendingAppName() ?? ""
-        appState.pendingScheduleName = match?.name ?? ""
-        appState.pendingScheduleReason = match?.reason ?? ""
+        appState.pendingIsQuickBlock = qb != nil
+        appState.pendingQuickBlockCancel = false
+        appState.pendingScheduleName = qb != nil ? "Hard block" : (match?.name ?? "")
+        appState.pendingScheduleReason = qb != nil ? (qb?.reason ?? "") : (match?.reason ?? "")
         appState.showingUnlock = true
     }
 
     private func initiateUnlock(category: ActivityCategoryToken) {
+        let qb = SharedState.activeQuickBlock()
         let active = schedules.filter { $0.isCurrentlyActive() }
         let match = active.first { $0.selection.categoryTokens.contains(category) } ?? active.first
         appState.pendingUnlockApp = nil
         appState.pendingUnlockCategory = category
         appState.pendingAppName = SharedState.loadPendingAppName() ?? ""
-        appState.pendingScheduleName = match?.name ?? ""
-        appState.pendingScheduleReason = match?.reason ?? ""
+        appState.pendingIsQuickBlock = qb != nil
+        appState.pendingQuickBlockCancel = false
+        appState.pendingScheduleName = qb != nil ? "Hard block" : (match?.name ?? "")
+        appState.pendingScheduleReason = qb != nil ? (qb?.reason ?? "") : (match?.reason ?? "")
         appState.showingUnlock = true
     }
 }
@@ -351,6 +439,63 @@ private struct EscapedAppRow: View {
             .font(.system(.subheadline, design: .monospaced))
             .foregroundStyle(remaining < 60 ? .red : .orange)
             .monospacedDigit()
+    }
+}
+
+private struct QuickBlockTimerCard: View {
+    let block: QuickBlock
+    let onExpired: () -> Void
+    let onEndEarly: () -> Void
+
+    @State private var now = Date()
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .foregroundStyle(.orange)
+                Text("Hard block active")
+                    .font(.headline)
+                Spacer()
+            }
+
+            Text(formatted(block.remaining(at: now)))
+                .font(.system(size: 44, weight: .bold, design: .monospaced))
+                .monospacedDigit()
+                .foregroundStyle(.orange)
+
+            Text("Locked until \(endSummary)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Button(role: .destructive) { onEndEarly() } label: {
+                Text("End early")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(.orange)
+        }
+        .padding(.vertical, 6)
+        .onReceive(timer) { tick in
+            now = tick
+            if !block.isActive(at: tick) { onExpired() }
+        }
+    }
+
+    private var endSummary: String {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "h:mm a"
+        return fmt.string(from: block.endTime)
+    }
+
+    private func formatted(_ remaining: TimeInterval) -> String {
+        let total = Int(remaining)
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        let s = total % 60
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
+        return String(format: "%d:%02d", m, s)
     }
 }
 

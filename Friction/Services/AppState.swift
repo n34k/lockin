@@ -25,6 +25,12 @@ final class AppState: ObservableObject {
     @Published var pendingAppName: String = ""
     @Published var pendingScheduleName: String = ""
     @Published var pendingScheduleReason: String = ""
+    // True when the pending unlock happens while a one-shot quick block is active —
+    // flips Locky into the strict, emergencies-only persona.
+    @Published var pendingIsQuickBlock = false
+    // True when the pending unlock is a request to END the active quick block early
+    // (rather than freeing a single app). Gated by the same strict mascot prompt.
+    @Published var pendingQuickBlockCancel = false
     @Published var unlockedEntries: [UnlockedEntry] = []
 
     func recordUnlock(app: ApplicationToken?, category: ActivityCategoryToken?, name: String, duration: Int?) {

@@ -20,17 +20,20 @@ final class MascotPreloader {
     private(set) var opener: MascotResponse?
     private var prepareTask: Task<Void, Never>?
     private var builtProfile: UserProfile?
+    private var builtIsQuickBlock = false
 
     var isReady: Bool { session != nil && opener != nil }
 
     /// Idempotent: no-op if a ready pair already exists or a build is already in
-    /// flight. Rebuilds from scratch if the user's profile changed.
+    /// flight. Rebuilds from scratch if the user's profile or the strictness mode
+    /// changed — a lenient opener must never leak into a hard block, or vice-versa.
     func preload(profile: UserProfile?, context: UnlockContext) {
-        if profile != builtProfile { invalidate() }
+        if profile != builtProfile || context.isQuickBlock != builtIsQuickBlock { invalidate() }
         guard !isReady, prepareTask == nil else { return }
         builtProfile = profile
+        builtIsQuickBlock = context.isQuickBlock
         prepareTask = Task { [weak self] in
-            let instructions = buildMascotSystemInstructions(profile: profile)
+            let instructions = buildMascotSystemInstructions(profile: profile, isQuickBlock: context.isQuickBlock)
             let session = LanguageModelSession { Instructions(instructions) }
             session.prewarm()
             let result = try? await session.respond(
@@ -67,5 +70,6 @@ final class MascotPreloader {
         session = nil
         opener = nil
         builtProfile = nil
+        builtIsQuickBlock = false
     }
 }

@@ -14,8 +14,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             let data = SharedState.loadPendingUnlockData()
             let scheduleContext = SharedState.loadPendingScheduleContext()
             let appName = SharedState.loadPendingAppName() ?? ""
+            let isQuickBlock = SharedState.loadPendingIsQuickBlock()
             Task { @MainActor in
                 let state = AppState.shared
+                state.pendingIsQuickBlock = isQuickBlock
                 if let data {
                     if type == "app", let token = try? JSONDecoder().decode(ApplicationToken.self, from: data) {
                         state.pendingUnlockApp = token

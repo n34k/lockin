@@ -37,6 +37,18 @@ class ShieldActionExtension: ShieldActionDelegate {
     }
 
     private func writeActiveScheduleContext() {
+        // A running quick block takes precedence: it flips Locky into strict mode and
+        // its reason (if any) becomes the block context the mascot references.
+        if let qbData = sharedDefaults.data(forKey: "quickBlock"),
+           let qb = try? JSONDecoder().decode(QuickBlockInfo.self, from: qbData),
+           qb.isActive() {
+            sharedDefaults.set(true, forKey: "pendingIsQuickBlock")
+            sharedDefaults.set("Hard block", forKey: "pendingScheduleName")
+            sharedDefaults.set(qb.reason, forKey: "pendingScheduleReason")
+            return
+        }
+        sharedDefaults.set(false, forKey: "pendingIsQuickBlock")
+
         guard let data = sharedDefaults.data(forKey: "blockSchedules"),
               let schedules = try? JSONDecoder().decode([ScheduleInfo].self, from: data),
               let active = schedules.first(where: { $0.isCurrentlyActive() })
@@ -78,4 +90,14 @@ private struct ScheduleInfo: Decodable {
         let endM   = endHour   * 60 + endMinute
         return nowM >= startM && nowM < endM
     }
+}
+
+// Minimal decodable mirror of QuickBlock — start/end/reason only. JSONDecoder ignores
+// the `selection` (a FamilyControls type unavailable in this extension) and `id` keys.
+private struct QuickBlockInfo: Decodable {
+    var startTime: Date
+    var endTime: Date
+    var reason: String
+
+    func isActive(at now: Date = Date()) -> Bool { now >= startTime && now < endTime }
 }

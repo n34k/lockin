@@ -155,7 +155,10 @@ struct MascotChallenge: UnlockChallenge {
             }
             // Fallback (e.g. reached via notification, or preload not finished): build
             // the session live and generate the opener now.
-            let instructions = buildMascotSystemInstructions(profile: SharedState.loadUserProfile())
+            let instructions = buildMascotSystemInstructions(
+                profile: SharedState.loadUserProfile(),
+                isQuickBlock: appState.pendingIsQuickBlock
+            )
             #if DEBUG
             print("=== [Friction] SYSTEM INSTRUCTIONS ===\n\(instructions)\n=======================================")
             #endif
@@ -171,10 +174,13 @@ struct MascotChallenge: UnlockChallenge {
     }
 
     private var unlockContext: UnlockContext {
-        UnlockContext(
+        let remaining = SharedState.activeQuickBlock().map { Int(ceil($0.remaining() / 60)) }
+        return UnlockContext(
             scheduleName: appState.pendingScheduleName,
             blockReason: appState.pendingScheduleReason,
-            unlocksToday: SharedState.unlocksToday()
+            unlocksToday: SharedState.unlocksToday(),
+            isQuickBlock: appState.pendingIsQuickBlock,
+            remainingMinutes: remaining
         )
     }
 

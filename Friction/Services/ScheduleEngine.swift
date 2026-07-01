@@ -30,4 +30,23 @@ final class ScheduleEngine {
             }
         }
     }
+
+    /// Backstop for a one-shot quick block: fires `intervalDidEnd` at the block's end
+    /// time so the shield comes down even if the app is never reopened. The shield is
+    /// applied directly and immediately at start time (the reliable synchronous path);
+    /// this only guarantees teardown. Wall-clock based, so it shares the schedules'
+    /// no-clean-overnight limitation — keep quick blocks short.
+    func applyQuickBlock(_ qb: QuickBlock) {
+        let cal = Calendar.current
+        let s = DeviceActivitySchedule(
+            intervalStart: cal.dateComponents([.hour, .minute, .second], from: qb.startTime),
+            intervalEnd:   cal.dateComponents([.hour, .minute, .second], from: qb.endTime),
+            repeats: false
+        )
+        try? center.startMonitoring(.quickBlock, during: s)
+    }
+
+    func stopQuickBlock() {
+        center.stopMonitoring([.quickBlock])
+    }
 }

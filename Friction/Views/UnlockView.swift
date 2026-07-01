@@ -14,6 +14,7 @@ struct UnlockView: View {
     @EnvironmentObject var appState: AppState
     @State private var showingSuccess = false
     @State private var unlockDuration: Int? = nil
+    @State private var endedHardBlock = false
     @State private var dismissTask: Task<Void, Never>? = nil
 
     var body: some View {
@@ -24,9 +25,9 @@ struct UnlockView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 72))
                             .foregroundStyle(.green)
-                        Text("Fine. You're in.")
+                        Text(endedHardBlock ? "Hard block lifted." : "Fine. You're in.")
                             .font(.title.bold())
-                        if let duration = unlockDuration {
+                        if !endedHardBlock, let duration = unlockDuration {
                             Text("You have \(duration) minute\(duration == 1 ? "" : "s").")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
@@ -48,6 +49,8 @@ struct UnlockView: View {
                         Button {
                             appState.pendingUnlockApp = nil
                             appState.pendingUnlockCategory = nil
+                            appState.pendingIsQuickBlock = false
+                            appState.pendingQuickBlockCancel = false
                             SharedState.clearPendingUnlock()
                             appState.showingUnlock = false
                         } label: {
@@ -77,6 +80,12 @@ struct UnlockView: View {
     }
 
     private func handleUnlock(_ duration: Int?) {
+        // Ending the hard block early is a different outcome than freeing one app:
+        // tear down the whole quick block instead of removing a single token.
+        if appState.pendingQuickBlockCancel {
+            endHardBlock()
+            return
+        }
         unlockDuration = duration
         SharedState.recordUnlockToday()
         appState.recordUnlock(
@@ -86,6 +95,25 @@ struct UnlockView: View {
             duration: duration
         )
         unlockTargeted()
+        finishWithSuccess()
+    }
+
+    private func endHardBlock() {
+        // Caving on a self-imposed lockdown counts toward escalation.
+        SharedState.recordUnlockToday()
+        SharedState.clearQuickBlock()
+        ScheduleEngine.shared.stopQuickBlock()
+        LiveActivityController.end()
+        appState.pendingIsQuickBlock = false
+        appState.pendingQuickBlockCancel = false
+        SharedState.clearPendingUnlock()
+        // The quick block's shields are dropped by ContentView's onDismiss → syncShields,
+        // which recomputes from schedules only (the quick block is gone).
+        endedHardBlock = true
+        finishWithSuccess()
+    }
+
+    private func finishWithSuccess() {
         withAnimation { showingSuccess = true }
         dismissTask?.cancel()
         dismissTask = Task {

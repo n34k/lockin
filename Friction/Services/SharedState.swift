@@ -14,10 +14,25 @@ struct UserProfile: Codable, Equatable {
 
 extension DeviceActivityName {
     static let work = Self("friction.work")
+    static let quickBlock = Self("friction.quickblock")
 
     static func schedule(id: UUID, weekday: Int) -> DeviceActivityName {
         Self("friction.schedule.\(id.uuidString).\(weekday)")
     }
+}
+
+/// A one-shot "Block Now" lockdown: starts immediately and runs for a fixed window,
+/// instead of repeating weekly like `BlockSchedule`. While one is active it takes
+/// precedence over schedules for the mascot prompt (Locky goes emergencies-only).
+struct QuickBlock: Codable {
+    var id: UUID = UUID()
+    var startTime: Date
+    var endTime: Date
+    var selection: FamilyActivitySelection
+    var reason: String = ""
+
+    func isActive(at now: Date = Date()) -> Bool { now >= startTime && now < endTime }
+    func remaining(at now: Date = Date()) -> TimeInterval { max(0, endTime.timeIntervalSince(now)) }
 }
 
 struct BlockSchedule: Codable, Identifiable {
@@ -98,10 +113,12 @@ struct BlockSchedule: Codable, Identifiable {
 enum SharedState {
     private static let defaults = UserDefaults(suiteName: appGroupID)!
     private static let schedulesKey = "blockSchedules"
+    private static let quickBlockKey = "quickBlock"
     private static let pendingTypeKey = "pendingUnlockType"
     private static let pendingDataKey = "pendingUnlockData"
     private static let pendingScheduleNameKey = "pendingScheduleName"
     private static let pendingScheduleReasonKey = "pendingScheduleReason"
+    private static let pendingIsQuickBlockKey = "pendingIsQuickBlock"
 
     static func saveSchedules(_ schedules: [BlockSchedule]) {
         guard let data = try? JSONEncoder().encode(schedules) else { return }
@@ -113,6 +130,43 @@ enum SharedState {
               let schedules = try? JSONDecoder().decode([BlockSchedule].self, from: data)
         else { return [] }
         return schedules
+    }
+
+    // MARK: - Quick block (one-shot "Block Now")
+
+    static func saveQuickBlock(_ block: QuickBlock) {
+        guard let data = try? JSONEncoder().encode(block) else { return }
+        defaults.set(data, forKey: quickBlockKey)
+    }
+
+    static func loadQuickBlock() -> QuickBlock? {
+        guard let data = defaults.data(forKey: quickBlockKey),
+              let block = try? JSONDecoder().decode(QuickBlock.self, from: data)
+        else { return nil }
+        return block
+    }
+
+    static func clearQuickBlock() {
+        defaults.removeObject(forKey: quickBlockKey)
+    }
+
+    /// Returns the stored quick block only while it's still running; an expired one is
+    /// cleared as a side effect so callers never have to defend against stale blocks.
+    static func activeQuickBlock(now: Date = Date()) -> QuickBlock? {
+        guard let block = loadQuickBlock() else { return nil }
+        guard block.isActive(at: now) else {
+            clearQuickBlock()
+            return nil
+        }
+        return block
+    }
+
+    static func savePendingIsQuickBlock(_ value: Bool) {
+        defaults.set(value, forKey: pendingIsQuickBlockKey)
+    }
+
+    static func loadPendingIsQuickBlock() -> Bool {
+        defaults.bool(forKey: pendingIsQuickBlockKey)
     }
 
     static func loadPendingUnlockType() -> String? {
@@ -201,5 +255,6 @@ enum SharedState {
         defaults.removeObject(forKey: pendingScheduleNameKey)
         defaults.removeObject(forKey: pendingScheduleReasonKey)
         defaults.removeObject(forKey: pendingAppNameKey)
+        defaults.removeObject(forKey: pendingIsQuickBlockKey)
     }
 }

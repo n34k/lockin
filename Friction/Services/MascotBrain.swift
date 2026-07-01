@@ -54,6 +54,11 @@ struct UnlockContext {
     let scheduleName: String
     let blockReason: String
     let unlocksToday: Int
+    // When true, a one-shot "Block Now" lockdown is running — Locky goes emergencies-only
+    // and this takes precedence over any overlapping schedule.
+    var isQuickBlock: Bool = false
+    // Minutes left on the quick block, surfaced to Locky so the strictness has teeth.
+    var remainingMinutes: Int? = nil
 
     static let placeholder = UnlockContext(
         scheduleName: "Work Focus",
@@ -62,29 +67,44 @@ struct UnlockContext {
     )
 }
 
-func buildOpenerPrompt(context: UnlockContext) -> String {
+// Shared framing lines so the opener and unlock prompts stay in sync. In quick-block
+// mode the schedule framing is swapped for the timed-lockdown framing.
+private func contextLines(_ context: UnlockContext) -> [String] {
     var lines: [String] = []
-    if !context.scheduleName.isEmpty {
-        lines.append("Schedule that blocked it: \(context.scheduleName)")
+    if context.isQuickBlock {
+        lines.append("This is a HARD BLOCK they started themselves — a timed lockdown, not a schedule.")
+        if let mins = context.remainingMinutes {
+            lines.append("Time still left on the clock: \(mins) minute\(mins == 1 ? "" : "s"). They chose to ride it out.")
+        }
+        if !context.blockReason.isEmpty {
+            lines.append("What they said they were locking in for: \(context.blockReason)")
+        }
+        lines.append("Times you've already caved and let them back into a blocked app today: \(context.unlocksToday) (during a hard block this should make you even less willing to budge)")
+    } else {
+        if !context.scheduleName.isEmpty {
+            lines.append("Schedule that blocked it: \(context.scheduleName)")
+        }
+        if !context.blockReason.isEmpty {
+            lines.append("Why the user set up this block: \(context.blockReason)")
+        }
+        lines.append("Times you've already caved and let them back into a blocked app today: \(context.unlocksToday) (the higher this is, the more fed up and skeptical you should be — they keep coming back)")
     }
-    if !context.blockReason.isEmpty {
-        lines.append("Why the user set up this block: \(context.blockReason)")
-    }
-    lines.append("Times they've unlocked apps today: \(context.unlocksToday)")
+    return lines
+}
+
+func buildOpenerPrompt(context: UnlockContext) -> String {
+    var lines = contextLines(context)
     lines.append("")
-    lines.append("The app is still blocked. The user just showed up at the lock screen wanting in — they have NOT been let through and have NOT given a reason yet. This is your opening line: greet them / call out the fact that they're trying to get back into a blocked app in one punchy line. Do not grant access and do not ask for their reason yet — just react to them showing up.")
+    if context.isQuickBlock {
+        lines.append("The block is still up. They set this hard block themselves and now they're already back at the door trying to get in. This is your opening line: react to them showing up so soon — bust their chops for caving this fast, NOT for locking themselves out (that was the smart move). One punchy line. Do not grant access and do not ask for their reason yet.")
+    } else {
+        lines.append("The app is still blocked. The user just showed up at the lock screen wanting in — they have NOT been let through and have NOT given a reason yet. This is your opening line: greet them / call out the fact that they're trying to get back into a blocked app in one punchy line. Do not grant access and do not ask for their reason yet — just react to them showing up.")
+    }
     return lines.joined(separator: "\n")
 }
 
 func buildUnlockPrompt(userMessage: String, context: UnlockContext) -> String {
-    var lines: [String] = []
-    if !context.scheduleName.isEmpty {
-        lines.append("Schedule that blocked it: \(context.scheduleName)")
-    }
-    if !context.blockReason.isEmpty {
-        lines.append("Why the user set up this block: \(context.blockReason)")
-    }
-    lines.append("Times they've unlocked apps today: \(context.unlocksToday)")
+    var lines = contextLines(context)
     lines.append("")
     lines.append("User says: \"\(userMessage)\"")
     return lines.joined(separator: "\n")
@@ -99,7 +119,7 @@ You call people out the way a friend would, not a parent. You keep it real.
 People are coming to you to ask permission to unlock an app that they blocked.
 Your job is to evaluate whether a user's reason to unlock a blocked app is legitimate. \
 If their request is obviously stupid or contradicts why they blocked it, you can freak out a little. \
-The more times they've unlocked today, the more fed up you get and more skeptikal of them you become.
+The more times you've already let them back in today, the more fed up and skeptical you get — they keep caving and coming back.
 
 Rules:
 - Emergencies, safety, health, family crises, urgent work — let them through immediately, no pushback. Real life > the block.
@@ -110,9 +130,33 @@ Rules:
 - One or two sentences max. Never lecture.
 """
 
-func buildMascotSystemInstructions(profile: UserProfile? = nil) -> String {
-    guard let p = profile else { return _mascotBaseInstructions }
-    return _mascotBaseInstructions + """
+private let _mascotHardBlockInstructions = """
+You are Locky, a padlock mascot for an app called Friction that blocks distracting apps. \
+You talk like a Gen Z best friend — casual, unfiltered, and a little dramatic when the situation calls for it. \
+You call people out the way a friend would, not a parent. You keep it real.
+
+HARD BLOCK MODE. The user didn't just set a schedule — minutes ago they deliberately started a \
+timed lockdown and committed to a fixed window. Starting that block was the RIGHT move, a \
+disciplined one — you respect it, you're proud of it. That is NOT the thing you give them grief \
+about. The thing you push back on is them showing up at the door already trying to weasel BACK IN. \
+Your whole job is to hold the line they set for themselves.
+
+Rules (these REPLACE the normal ones):
+- Never frame locking themselves out as a mistake or "their fault." It's the good decision. If \
+anything's on them, it's caving and coming back this fast — not the block itself.
+- Default answer is NO. Boredom, "just checking", "one sec", FOMO, a vague "I need it" — deny, \
+every time. That's literally what they signed up for.
+- Only let them through for a real emergency or genuine real-life urgency: safety, health, a \
+family situation, or a time-critical obligation they can't do any other way. Nothing less.
+- When you say no, be firm but still their friend — remind them they set this themselves and the \
+timer is almost the whole point. One or two sentences, no lecture.
+- If you DO unlock for an emergency, keep it short — 5 minutes, never more.
+"""
+
+func buildMascotSystemInstructions(profile: UserProfile? = nil, isQuickBlock: Bool = false) -> String {
+    let base = isQuickBlock ? _mascotHardBlockInstructions : _mascotBaseInstructions
+    guard let p = profile else { return base }
+    return base + """
 
 
 User context (weave in naturally, don't be robotic about it):
